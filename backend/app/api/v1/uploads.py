@@ -62,7 +62,7 @@ async def upload_to_local(file_content: bytes, filename: str) -> str:
     return f"/uploads/{filename}"
 
 
-@router.post("/", response_model=Dict[str, str])
+@router.post("", response_model=Dict[str, str])
 async def upload_file(file: UploadFile = File(...)):
     try:
         # Security: Sanitize filename to prevent path traversal

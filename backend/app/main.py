@@ -24,6 +24,7 @@ app = FastAPI(
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
+    redirect_slashes=True  # Add this line
 )
 
 # Register rate limiter

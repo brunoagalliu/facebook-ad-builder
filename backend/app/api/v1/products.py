@@ -29,7 +29,7 @@ def read_product(
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@router.post("/", response_model=Product)
+@router.post("", response_model=Product)
 def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),

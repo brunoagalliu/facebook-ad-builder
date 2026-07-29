@@ -93,7 +93,7 @@ def get_ad_style(style_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ad style not found")
     return style
 
-@router.post("/", response_model=AdStyleResponse)
+@router.post("", response_model=AdStyleResponse)
 def create_ad_style(style: AdStyleCreate, db: Session = Depends(get_db)):
     """Create a new ad style"""
     # Check if style with this ID already exists

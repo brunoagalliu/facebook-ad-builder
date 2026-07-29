@@ -49,7 +49,7 @@ def get_prompt(prompt_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Prompt not found")
     return prompt
 
-@router.post("/", response_model=PromptResponse)
+@router.post("", response_model=PromptResponse)
 def create_prompt(prompt: PromptCreate, db: Session = Depends(get_db)):
     """Create a new prompt"""
     # Check if prompt with this ID already exists
