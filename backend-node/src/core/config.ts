@@ -60,6 +60,14 @@ export const settings = {
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS ?? "",
   TRUSTED_PROXIES: process.env.TRUSTED_PROXIES ?? "*",
 
+  // Railway sets this to the service's own public domain automatically — used so
+  // locally-stored uploads (Railway Volume, not R2) can return an absolute URL
+  // instead of a bare "/uploads/..." path. A relative path only works if the
+  // consumer happens to be on the same origin, which the deployed frontend isn't.
+  PUBLIC_BASE_URL: process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : `http://localhost:${process.env.PORT ?? 8000}`,
+
   get r2Enabled(): boolean {
     return Boolean(this.R2_ACCOUNT_ID && this.R2_ACCESS_KEY_ID && this.R2_SECRET_ACCESS_KEY);
   },

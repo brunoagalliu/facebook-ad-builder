@@ -5,14 +5,11 @@
  * or a generation call fails).
  */
 import { fal } from "@fal-ai/client";
-import fs from "fs/promises";
-import path from "path";
 import { randomUUID } from "crypto";
 
 import { settings } from "../core/config";
 import { ImageGenerationRequestInput } from "../schemas/generatedAd";
-
-const uploadsDir = path.join(__dirname, "..", "..", "uploads");
+import { uploadToLocal } from "./storage";
 
 export function buildComprehensivePrompt(request: ImageGenerationRequestInput): string {
   if (request.customPrompt) return request.customPrompt;
@@ -58,9 +55,7 @@ export async function downloadAndSaveImage(imageUrl: string, prefix = "generated
     const buffer = Buffer.from(await response.arrayBuffer());
 
     const filename = `${prefix}_${randomUUID()}.png`;
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.writeFile(path.join(uploadsDir, filename), buffer);
-    return `/uploads/${filename}`;
+    return await uploadToLocal(buffer, filename);
   } catch (err) {
     console.error("Error downloading image:", err);
     return imageUrl;
