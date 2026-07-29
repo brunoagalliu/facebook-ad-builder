@@ -5,13 +5,18 @@ import path from "path";
 
 import { settings } from "./core/config";
 import { securityHeaders } from "./middleware/securityHeaders";
+import adRemixRouter from "./routes/adRemix";
 import adStylesRouter from "./routes/adStyles";
 import authRouter from "./routes/auth";
 import brandsRouter from "./routes/brands";
+import copyGenerationRouter from "./routes/copyGeneration";
 import dashboardRouter from "./routes/dashboard";
+import facebookRouter from "./routes/facebook";
+import generatedAdsRouter from "./routes/generatedAds";
 import productsRouter from "./routes/products";
 import profilesRouter from "./routes/profiles";
 import promptsRouter from "./routes/prompts";
+import researchRouter from "./routes/research";
 import templatesRouter from "./routes/templates";
 import uploadsRouter from "./routes/uploads";
 
@@ -67,10 +72,13 @@ export function createApp(): express.Express {
   app.use("/api/v1/prompts", promptsRouter);
   app.use("/api/v1/uploads", uploadsRouter);
   app.use("/api/v1/dashboard", dashboardRouter);
+  app.use("/api/v1/copy-generation", copyGenerationRouter);
+  app.use("/api/v1/generated-ads", generatedAdsRouter);
+  app.use("/api/v1/ad-remix", adRemixRouter);
+  app.use("/api/v1/research", researchRouter);
+  app.use("/api/v1/facebook", facebookRouter);
 
-  // Remaining feature routers mount here as they're ported, e.g.:
-  // app.use("/api/v1/copy-generation", copyGenerationRouter);
-  // ... (see backend/app/main.py for the full prefix list to mirror)
+  // All routes from backend/app/main.py are now ported.
 
   app.use((req: Request, res: Response) => {
     res.status(404).json({ detail: "Not Found" });

@@ -1,0 +1,171 @@
+import type { GeneratedAd } from "@prisma/client";
+import { Router } from "express";
+
+import { prisma } from "../core/prisma";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { requireAuth, requirePermission } from "../middleware/auth";
+import { validateBody } from "../middleware/validate";
+import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
+import { generateImages } from "../services/imageGenerationService";
+
+const router = Router();
+
+router.post(
+  "/generate-image",
+  requirePermission("ads:write"),
+  validateBody(imageGenerationRequestSchema),
+  asyncHandler(async (req, res) => {
+    const images = await generateImages(req.body);
+    res.json({ images });
+  })
+);
+
+function serialize(ad: GeneratedAd) {
+  return {
+    id: ad.id,
+    brand_id: ad.brandId,
+    product_id: ad.productId,
+    template_id: ad.templateId,
+    image_url: ad.imageUrl,
+    headline: ad.headline,
+    body: ad.body,
+    cta: ad.cta,
+    size_name: ad.sizeName,
+    dimensions: ad.dimensions,
+    prompt: ad.prompt,
+    ad_bundle_id: ad.adBundleId,
+    created_at: ad.createdAt ? ad.createdAt.toISOString() : null,
+    media_type: ad.mediaType || "image",
+    video_url: ad.videoUrl,
+    video_id: ad.videoId,
+    thumbnail_url: ad.thumbnailUrl,
+  };
+}
+
+router.get(
+  "",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const brandId = req.query.brand_id as string | undefined;
+    const ads = await prisma.generatedAd.findMany({
+      where: brandId ? { brandId } : undefined,
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(ads.map(serialize));
+  })
+);
+
+router.delete(
+  "/:adId",
+  requirePermission("ads:delete"),
+  asyncHandler(async (req, res) => {
+    const ad = await prisma.generatedAd.findUnique({ where: { id: req.params.adId } });
+    if (!ad) {
+      res.status(404).json({ detail: "Ad not found" });
+      return;
+    }
+    await prisma.generatedAd.delete({ where: { id: req.params.adId } });
+    res.json({ message: "Ad deleted successfully" });
+  })
+);
+
+function csvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+router.post(
+  "/export-csv",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const ids = (req.body?.ids ?? []) as string[];
+    if (!ids.length) {
+      res.status(400).json({ detail: "No ad IDs provided" });
+      return;
+    }
+    const ads = await prisma.generatedAd.findMany({ where: { id: { in: ids } } });
+
+    const header = [
+      "ID",
+      "Brand ID",
+      "Headline",
+      "Body",
+      "CTA",
+      "Size",
+      "Dimensions",
+      "Media Type",
+      "Image URL",
+      "Video URL",
+      "Video ID",
+      "Thumbnail URL",
+      "Created At",
+    ];
+    const rows = ads.map((ad) =>
+      [
+        ad.id,
+        ad.brandId ?? "",
+        ad.headline ?? "",
+        ad.body ?? "",
+        ad.cta ?? "",
+        ad.sizeName ?? "",
+        ad.dimensions ?? "",
+        ad.mediaType ?? "image",
+        ad.imageUrl ?? "",
+        ad.videoUrl ?? "",
+        ad.videoId ?? "",
+        ad.thumbnailUrl ?? "",
+        ad.createdAt ? ad.createdAt.toISOString() : "",
+      ]
+        .map(csvField)
+        .join(",")
+    );
+    const csv = [header.map(csvField).join(","), ...rows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=generated-ads.csv");
+    res.send(csv);
+  })
+);
+
+router.post(
+  "/batch",
+  requirePermission("ads:write"),
+  validateBody(batchSaveRequestSchema),
+  asyncHandler(async (req, res) => {
+    const body = req.body as BatchSaveRequestInput;
+    let savedCount = 0;
+
+    try {
+      for (const adData of body.ads) {
+        const existing = await prisma.generatedAd.findUnique({ where: { id: adData.id } });
+        if (existing) continue;
+
+        await prisma.generatedAd.create({
+          data: {
+            id: adData.id,
+            brandId: adData.brandId,
+            productId: adData.productId,
+            templateId: adData.templateId,
+            imageUrl: adData.imageUrl,
+            headline: adData.headline,
+            body: adData.body,
+            cta: adData.cta,
+            sizeName: adData.sizeName,
+            dimensions: adData.dimensions,
+            prompt: adData.prompt,
+            adBundleId: adData.adBundleId,
+            mediaType: adData.mediaType || "image",
+            videoUrl: adData.videoUrl,
+            videoId: adData.videoId,
+            thumbnailUrl: adData.thumbnailUrl,
+          },
+        });
+        savedCount++;
+      }
+      res.json({ message: `Saved ${savedCount} ads`, count: savedCount });
+    } catch (err) {
+      res.status(500).json({ detail: (err as Error).message });
+    }
+  })
+);
+
+export default router;

@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { settings } from "./core/config";
+import { startScheduledSearchCron } from "./core/cron";
 import { prisma } from "./core/prisma";
 
 function sanitizeDatabaseUrl(url: string): string {
@@ -23,6 +24,8 @@ async function main(): Promise<void> {
   app.listen(port, "0.0.0.0", () => {
     console.log(`Facebook Ad Automation API listening on port ${port}`);
   });
+
+  startScheduledSearchCron();
 }
 
 main();

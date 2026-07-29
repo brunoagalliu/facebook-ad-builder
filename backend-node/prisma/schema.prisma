@@ -35,8 +35,8 @@ model User {
 }
 
 model Role {
-  id          String @id @default(uuid())
-  name        String @unique
+  id          String  @id @default(uuid())
+  name        String  @unique
   description String?
 
   users       User[]       @relation("UserRoles")
@@ -46,8 +46,8 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(uuid())
-  name        String @unique
+  id          String  @id @default(uuid())
+  name        String  @unique
   description String?
 
   roles Role[] @relation("RolePermissions")
@@ -70,15 +70,15 @@ model RefreshToken {
 // ---------- Brand / Product / Audience ----------
 
 model Brand {
-  id              String   @id @default(uuid())
-  name            String
-  logo            String?
-  primaryColor    String   @default("#3B82F6") @map("primary_color")
-  secondaryColor  String   @default("#10B981") @map("secondary_color")
-  highlightColor  String   @default("#F59E0B") @map("highlight_color")
-  voice           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  name           String
+  logo           String?
+  primaryColor   String   @default("#3B82F6") @map("primary_color")
+  secondaryColor String   @default("#10B981") @map("secondary_color")
+  highlightColor String   @default("#F59E0B") @map("highlight_color")
+  voice          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
   products     Product[]
   profiles     CustomerProfile[] @relation("BrandProfiles")
@@ -88,13 +88,13 @@ model Brand {
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  brandId     String   @map("brand_id")
-  name        String
-  description String?
-  productShots Json?   @map("product_shots")
-  defaultUrl  String?  @map("default_url")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  brandId      String   @map("brand_id")
+  name         String
+  description  String?
+  productShots Json?    @map("product_shots")
+  defaultUrl   String?  @map("default_url")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
@@ -102,12 +102,12 @@ model Product {
 }
 
 model CustomerProfile {
-  id            String   @id @default(uuid())
-  name          String
-  demographics  String?
-  painPoints    String?  @map("pain_points")
-  goals         String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  name         String
+  demographics String?
+  painPoints   String?  @map("pain_points")
+  goals        String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   brands Brand[] @relation("BrandProfiles")
 
@@ -191,7 +191,7 @@ model WinningAd {
   recreationPrompt    String?   @map("recreation_prompt")
   topic               String?
   mood                String?
-  subjectMatter        String?  @map("subject_matter")
+  subjectMatter       String?   @map("subject_matter")
   copyAnalysis        String?   @map("copy_analysis")
   productName         String?   @map("product_name")
   category            String?
@@ -240,46 +240,53 @@ model GeneratedAd {
 }
 
 // ---------- Research / competitor scraping ----------
+// Verbatim from backend/app/models.py (confirmed against source directly, not best-effort).
 
 model Vertical {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   savedSearches SavedSearch[]
+  searchLogs    SearchLog[]
+  facebookPages FacebookPage[]
 
   @@map("verticals")
 }
 
-/// best-effort: exact columns not verbatim-confirmed against models.py
 model FacebookPage {
-  id        String   @id @default(uuid())
-  pageId    String?  @unique @map("page_id")
-  pageName  String?  @map("page_name")
-  totalAds  Int      @default(0) @map("total_ads")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  pageName   String   @unique @map("page_name")
+  pageUrl    String?  @map("page_url")
+  verticalId String?  @map("vertical_id")
+  totalAds   Int      @default(0) @map("total_ads")
+  firstSeen  DateTime @default(now()) @map("first_seen")
+  lastSeen   DateTime @default(now()) @updatedAt @map("last_seen")
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  scrapedAds ScrapedAd[]
+  vertical Vertical?   @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  ads      ScrapedAd[]
 
   @@map("facebook_pages")
 }
 
-/// best-effort: counters confirmed via SavedSearchResponse schema, schedule fields via scheduler_service.py
 model SavedSearch {
-  id                String    @id @default(uuid())
-  query             String
-  country           String?
-  verticalId        String?   @map("vertical_id")
-  negativeKeywords  Json?     @map("negative_keywords")
-  searchType        String    @default("one_time") @map("search_type")
-  scheduleConfig    Json?     @map("schedule_config")
-  isActive          Boolean   @default(true) @map("is_active")
-  lastRun           DateTime? @map("last_run")
-  adsRequested      Int       @default(0) @map("ads_requested")
-  adsReturned       Int       @default(0) @map("ads_returned")
-  adsNew            Int       @default(0) @map("ads_new")
-  adsDuplicate      Int       @default(0) @map("ads_duplicate")
-  createdAt         DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  query            String
+  country          String?
+  negativeKeywords Json?     @map("negative_keywords")
+  verticalId       String?   @map("vertical_id")
+  searchType       String    @default("one_time") @map("search_type")
+  scheduleConfig   Json?     @map("schedule_config")
+  isActive         Boolean   @default(true) @map("is_active")
+  lastRun          DateTime? @map("last_run")
+  adsRequested     Int?      @map("ads_requested")
+  adsReturned      Int?      @map("ads_returned")
+  adsNew           Int?      @map("ads_new")
+  adsDuplicate     Int?      @map("ads_duplicate")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   vertical Vertical?   @relation(fields: [verticalId], references: [id], onDelete: SetNull)
   ads      ScrapedAd[]
@@ -287,18 +294,23 @@ model SavedSearch {
   @@map("saved_searches")
 }
 
-/// best-effort: exact columns not verbatim-confirmed against models.py
 model ApiUsageLog {
-  id        String   @id @default(uuid())
-  callsMade Int      @default(0) @map("calls_made")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  endpoint    String
+  apiCalls    Int      @map("api_calls")
+  adsReturned Int      @map("ads_returned")
+  adsSaved    Int      @map("ads_saved")
+  query       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  date        String
 
   @@map("api_usage_logs")
 }
 
 model PageBlacklist {
   id        String   @id @default(uuid())
-  pageName  String   @map("page_name")
+  pageName  String   @unique @map("page_name")
+  reason    String?
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("page_blacklist")
@@ -306,39 +318,54 @@ model PageBlacklist {
 
 model KeywordBlacklist {
   id        String   @id @default(uuid())
-  keyword   String
+  keyword   String   @unique
+  reason    String?
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("keyword_blacklist")
 }
 
 model SearchLog {
-  id           String   @id @default(uuid())
-  apiCallsMade Int      @default(0) @map("api_calls_made")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                         String   @id @default(uuid())
+  searchQuery                String   @map("search_query")
+  country                    String?
+  negativeKeywords           Json?    @map("negative_keywords")
+  verticalId                 String?  @map("vertical_id")
+  totalAdsFound              Int      @default(0) @map("total_ads_found")
+  filteredByPageBlacklist    Int      @default(0) @map("filtered_by_page_blacklist")
+  filteredByKeywordBlacklist Int      @default(0) @map("filtered_by_keyword_blacklist")
+  finalAdsSaved              Int      @default(0) @map("final_ads_saved")
+  newPagesBlacklisted        Json?    @map("new_pages_blacklisted")
+  apiCallsMade               Int      @default(0) @map("api_calls_made")
+  searchType                 String?  @map("search_type")
+  executionTimeSeconds       Int?     @map("execution_time_seconds")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  date                       String
+
+  vertical Vertical? @relation(fields: [verticalId], references: [id], onDelete: SetNull)
 
   @@map("search_logs")
 }
 
 model ScrapedAd {
-  id             String    @id @default(uuid())
-  brandName      String?   @map("brand_name")
+  id             String   @id @default(uuid())
+  brandName      String?  @map("brand_name")
   headline       String?
-  adCopy         String?   @map("ad_copy")
-  ctaText        String?   @map("cta_text")
-  platform       String    @default("facebook")
-  externalId     String?   @unique @map("external_id")
-  contentHash    String?   @unique @map("content_hash")
-  adLink         String    @map("ad_link")
+  adCopy         String?  @map("ad_copy")
+  ctaText        String?  @map("cta_text")
+  platform       String   @default("facebook")
+  externalId     String?  @unique @map("external_id")
+  contentHash    String?  @unique @map("content_hash")
+  adLink         String   @map("ad_link")
   platforms      Json?
-  startDate      String?   @map("start_date")
-  mediaType      String?   @map("media_type")
-  firstSeen      DateTime  @default(now()) @map("first_seen")
-  lastSeen       DateTime  @default(now()) @updatedAt @map("last_seen")
-  seenCount      Int       @default(1) @map("seen_count")
-  searchId       String?   @map("search_id")
-  facebookPageId String?   @map("facebook_page_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  startDate      String?  @map("start_date")
+  mediaType      String?  @map("media_type")
+  firstSeen      DateTime @default(now()) @map("first_seen")
+  lastSeen       DateTime @default(now()) @updatedAt @map("last_seen")
+  seenCount      Int      @default(1) @map("seen_count")
+  searchId       String?  @map("search_id")
+  facebookPageId String?  @map("facebook_page_id")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   savedSearch  SavedSearch?  @relation(fields: [searchId], references: [id], onDelete: Cascade)
   facebookPage FacebookPage? @relation(fields: [facebookPageId], references: [id], onDelete: SetNull)
@@ -349,14 +376,15 @@ model ScrapedAd {
 model BrandScrape {
   id              String   @id @default(uuid())
   brandName       String   @map("brand_name")
-  pageUrl         String   @map("page_url")
-  pageId          String?  @map("page_id")
+  pageId          String   @map("page_id")
   pageName        String?  @map("page_name")
+  pageUrl         String   @map("page_url")
   totalAds        Int      @default(0) @map("total_ads")
   mediaDownloaded Int      @default(0) @map("media_downloaded")
   status          String   @default("pending")
   errorMessage    String?  @map("error_message")
   createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
   ads BrandScrapedAd[]
 
@@ -364,17 +392,21 @@ model BrandScrape {
 }
 
 model BrandScrapedAd {
-  id                 String   @id @default(uuid())
-  brandScrapeId      String   @map("brand_scrape_id")
-  headline           String?
-  adCopy             String?  @map("ad_copy")
-  ctaText            String?  @map("cta_text")
-  platforms          Json?
-  startDate          String?  @map("start_date")
-  mediaUrls          Json?    @map("media_urls")
-  originalMediaUrls  Json?    @map("original_media_urls")
-  mediaType          String?  @map("media_type")
-  createdAt          DateTime @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  brandScrapeId     String   @map("brand_scrape_id")
+  externalId        String   @map("external_id")
+  pageName          String?  @map("page_name")
+  pageLink          String?  @map("page_link")
+  headline          String?
+  adCopy            String?  @map("ad_copy")
+  ctaText           String?  @map("cta_text")
+  mediaType         String?  @map("media_type")
+  mediaUrls         Json?    @map("media_urls")
+  originalMediaUrls Json?    @map("original_media_urls")
+  platforms         Json?
+  startDate         String?  @map("start_date")
+  adLink            String?  @map("ad_link")
+  createdAt         DateTime @default(now()) @map("created_at")
 
   brandScrape BrandScrape @relation(fields: [brandScrapeId], references: [id], onDelete: Cascade)
 
@@ -396,18 +428,18 @@ model Prompt {
 }
 
 model AdStyle {
-  id            String  @id
-  name          String
-  category      String
-  description   String?
-  bestFor       Json?   @map("best_for")
-  visualLayout  String? @map("visual_layout")
-  psychology    String?
-  mood          String?
-  lighting      String?
-  composition   String?
-  designStyle   String? @map("design_style")
-  prompt        String?
+  id           String  @id
+  name         String
+  category     String
+  description  String?
+  bestFor      Json?   @map("best_for")
+  visualLayout String? @map("visual_layout")
+  psychology   String?
+  mood         String?
+  lighting     String?
+  composition  String?
+  designStyle  String? @map("design_style")
+  prompt       String?
 
   @@map("ad_styles")
 }
