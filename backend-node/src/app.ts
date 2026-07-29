@@ -29,15 +29,17 @@ export function createApp(): express.Express {
   // main.py: ProxyHeadersMiddleware trusts X-Forwarded-* per TRUSTED_PROXIES (default "*")
   app.set("trust proxy", settings.TRUSTED_PROXIES === "*" ? true : settings.TRUSTED_PROXIES);
 
-  const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    ...settings.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
-  ];
+  const configuredOrigins = settings.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);
+  // The `cors` package matches array entries by strict string equality — a literal "*"
+  // in that array never matches a real browser's Origin header, so it silently allowed
+  // nothing beyond the two localhost defaults. `origin: true` reflects the actual
+  // request's Origin back (spec-compliant with credentials, unlike a literal "*").
+  const allowAllOrigins = configuredOrigins.includes("*");
+  const allowedOrigins = ["http://localhost:5173", "http://localhost:3000", ...configuredOrigins];
 
   app.use(
     cors({
-      origin: allowedOrigins,
+      origin: allowAllOrigins ? true : allowedOrigins,
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
