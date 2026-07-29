@@ -1,0 +1,411 @@
+// Hand-written from the documented Python/SQLAlchemy model inventory (backend/app/models.py)
+// while production DB credentials were unavailable for `prisma db pull`.
+//
+// PROVISIONAL: models marked "best-effort" below were not read verbatim from models.py during
+// exploration (only referenced indirectly via route/service behavior). Once real production
+// credentials are available, run `prisma db pull` against a staging copy and reconcile this
+// file against the actual introspected schema before trusting it for migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Auth / RBAC ----------
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  hashedPassword String   @map("hashed_password")
+  name           String?
+  isActive       Boolean  @default(true) @map("is_active")
+  isSuperuser    Boolean  @default(false) @map("is_superuser")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  roles         Role[]         @relation("UserRoles")
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String?
+
+  users       User[]       @relation("UserRoles")
+  permissions Permission[] @relation("RolePermissions")
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String?
+
+  roles Role[] @relation("RolePermissions")
+
+  @@map("permissions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ---------- Brand / Product / Audience ----------
+
+model Brand {
+  id              String   @id @default(uuid())
+  name            String
+  logo            String?
+  primaryColor    String   @default("#3B82F6") @map("primary_color")
+  secondaryColor  String   @default("#10B981") @map("secondary_color")
+  highlightColor  String   @default("#F59E0B") @map("highlight_color")
+  voice           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  products     Product[]
+  profiles     CustomerProfile[] @relation("BrandProfiles")
+  generatedAds GeneratedAd[]
+
+  @@map("brands")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  brandId     String   @map("brand_id")
+  name        String
+  description String?
+  productShots Json?   @map("product_shots")
+  defaultUrl  String?  @map("default_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("products")
+}
+
+model CustomerProfile {
+  id            String   @id @default(uuid())
+  name          String
+  demographics  String?
+  painPoints    String?  @map("pain_points")
+  goals         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  brands Brand[] @relation("BrandProfiles")
+
+  @@map("customer_profiles")
+}
+
+// ---------- Facebook campaign management (locally-persisted mirror) ----------
+
+model FacebookCampaign {
+  id           String   @id @default(uuid())
+  name         String
+  objective    String?
+  budgetType   String?  @map("budget_type")
+  dailyBudget  Int?     @map("daily_budget")
+  bidStrategy  String?  @map("bid_strategy")
+  status       String   @default("PAUSED")
+  fbCampaignId String?  @map("fb_campaign_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  adSets FacebookAdSet[]
+
+  @@map("facebook_campaigns")
+}
+
+model FacebookAdSet {
+  id               String   @id @default(uuid())
+  campaignId       String   @map("campaign_id")
+  name             String
+  optimizationGoal String?  @map("optimization_goal")
+  dailyBudget      Int?     @map("daily_budget")
+  bidStrategy      String?  @map("bid_strategy")
+  bidAmount        Int?     @map("bid_amount")
+  targeting        Json?
+  pixelId          String?  @map("pixel_id")
+  conversionEvent  String?  @map("conversion_event")
+  status           String   @default("PAUSED")
+  fbAdsetId        String?  @map("fb_adset_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  campaign FacebookCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ads      FacebookAd[]
+
+  @@map("facebook_adsets")
+}
+
+model FacebookAd {
+  id           String   @id @default(uuid())
+  adsetId      String   @map("adset_id")
+  name         String
+  creativeName String?  @map("creative_name")
+  imageUrl     String?  @map("image_url")
+  mediaType    String   @default("image") @map("media_type")
+  videoUrl     String?  @map("video_url")
+  videoId      String?  @map("video_id")
+  thumbnailUrl String?  @map("thumbnail_url")
+  bodies       Json?
+  headlines    Json?
+  description  String?
+  cta          String?
+  websiteUrl   String?  @map("website_url")
+  status       String   @default("ACTIVE")
+  fbAdId       String?  @map("fb_ad_id")
+  fbCreativeId String?  @map("fb_creative_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  adSet FacebookAdSet @relation(fields: [adsetId], references: [id], onDelete: Cascade)
+
+  @@map("facebook_ads")
+}
+
+// ---------- Templates / Ad Remix / Generated ads ----------
+
+model WinningAd {
+  id                  String    @id @default(uuid())
+  name                String
+  imageUrl            String    @map("image_url")
+  notes               String?
+  tags                String?
+  analysis            String?
+  recreationPrompt    String?   @map("recreation_prompt")
+  topic               String?
+  mood                String?
+  subjectMatter        String?  @map("subject_matter")
+  copyAnalysis        String?   @map("copy_analysis")
+  productName         String?   @map("product_name")
+  category            String?
+  designStyle         String?   @map("design_style")
+  filename            String?
+  structuralAnalysis  String?   @map("structural_analysis")
+  layering            String?
+  templateStructure   Json?     @map("template_structure")
+  colorPalette        Json?     @map("color_palette")
+  typographySystem    Json?     @map("typography_system")
+  copyPatterns        Json?     @map("copy_patterns")
+  visualElements      Json?     @map("visual_elements")
+  templateCategory    String?   @map("template_category")
+  blueprintJson       Json?     @map("blueprint_json")
+  blueprintAnalyzedAt DateTime? @map("blueprint_analyzed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  generatedAds GeneratedAd[]
+
+  @@map("winning_ads")
+}
+
+model GeneratedAd {
+  id           String   @id @default(uuid())
+  brandId      String?  @map("brand_id")
+  productId    String?  @map("product_id")
+  templateId   String?  @map("template_id")
+  imageUrl     String?  @map("image_url")
+  headline     String?
+  body         String?
+  cta          String?
+  sizeName     String?  @map("size_name")
+  dimensions   String?
+  prompt       String?
+  adBundleId   String?  @map("ad_bundle_id")
+  mediaType    String   @default("image") @map("media_type")
+  videoUrl     String?  @map("video_url")
+  videoId      String?  @map("video_id")
+  thumbnailUrl String?  @map("thumbnail_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  brand    Brand?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  template WinningAd? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@map("generated_ads")
+}
+
+// ---------- Research / competitor scraping ----------
+
+model Vertical {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  savedSearches SavedSearch[]
+
+  @@map("verticals")
+}
+
+/// best-effort: exact columns not verbatim-confirmed against models.py
+model FacebookPage {
+  id        String   @id @default(uuid())
+  pageId    String?  @unique @map("page_id")
+  pageName  String?  @map("page_name")
+  totalAds  Int      @default(0) @map("total_ads")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scrapedAds ScrapedAd[]
+
+  @@map("facebook_pages")
+}
+
+/// best-effort: counters confirmed via SavedSearchResponse schema, schedule fields via scheduler_service.py
+model SavedSearch {
+  id                String    @id @default(uuid())
+  query             String
+  country           String?
+  verticalId        String?   @map("vertical_id")
+  negativeKeywords  Json?     @map("negative_keywords")
+  searchType        String    @default("one_time") @map("search_type")
+  scheduleConfig    Json?     @map("schedule_config")
+  isActive          Boolean   @default(true) @map("is_active")
+  lastRun           DateTime? @map("last_run")
+  adsRequested      Int       @default(0) @map("ads_requested")
+  adsReturned       Int       @default(0) @map("ads_returned")
+  adsNew            Int       @default(0) @map("ads_new")
+  adsDuplicate      Int       @default(0) @map("ads_duplicate")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  vertical Vertical?   @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  ads      ScrapedAd[]
+
+  @@map("saved_searches")
+}
+
+/// best-effort: exact columns not verbatim-confirmed against models.py
+model ApiUsageLog {
+  id        String   @id @default(uuid())
+  callsMade Int      @default(0) @map("calls_made")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("api_usage_logs")
+}
+
+model PageBlacklist {
+  id        String   @id @default(uuid())
+  pageName  String   @map("page_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("page_blacklist")
+}
+
+model KeywordBlacklist {
+  id        String   @id @default(uuid())
+  keyword   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("keyword_blacklist")
+}
+
+model SearchLog {
+  id           String   @id @default(uuid())
+  apiCallsMade Int      @default(0) @map("api_calls_made")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("search_logs")
+}
+
+model ScrapedAd {
+  id             String    @id @default(uuid())
+  brandName      String?   @map("brand_name")
+  headline       String?
+  adCopy         String?   @map("ad_copy")
+  ctaText        String?   @map("cta_text")
+  platform       String    @default("facebook")
+  externalId     String?   @unique @map("external_id")
+  contentHash    String?   @unique @map("content_hash")
+  adLink         String    @map("ad_link")
+  platforms      Json?
+  startDate      String?   @map("start_date")
+  mediaType      String?   @map("media_type")
+  firstSeen      DateTime  @default(now()) @map("first_seen")
+  lastSeen       DateTime  @default(now()) @updatedAt @map("last_seen")
+  seenCount      Int       @default(1) @map("seen_count")
+  searchId       String?   @map("search_id")
+  facebookPageId String?   @map("facebook_page_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  savedSearch  SavedSearch?  @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  facebookPage FacebookPage? @relation(fields: [facebookPageId], references: [id], onDelete: SetNull)
+
+  @@map("scraped_ads")
+}
+
+model BrandScrape {
+  id              String   @id @default(uuid())
+  brandName       String   @map("brand_name")
+  pageUrl         String   @map("page_url")
+  pageId          String?  @map("page_id")
+  pageName        String?  @map("page_name")
+  totalAds        Int      @default(0) @map("total_ads")
+  mediaDownloaded Int      @default(0) @map("media_downloaded")
+  status          String   @default("pending")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  ads BrandScrapedAd[]
+
+  @@map("brand_scrapes")
+}
+
+model BrandScrapedAd {
+  id                 String   @id @default(uuid())
+  brandScrapeId      String   @map("brand_scrape_id")
+  headline           String?
+  adCopy             String?  @map("ad_copy")
+  ctaText            String?  @map("cta_text")
+  platforms          Json?
+  startDate          String?  @map("start_date")
+  mediaUrls          Json?    @map("media_urls")
+  originalMediaUrls  Json?    @map("original_media_urls")
+  mediaType          String?  @map("media_type")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  brandScrape BrandScrape @relation(fields: [brandScrapeId], references: [id], onDelete: Cascade)
+
+  @@map("brand_scraped_ads")
+}
+
+// ---------- Reusable prompt / style libraries ----------
+
+model Prompt {
+  id          String  @id
+  name        String
+  category    String
+  template    String
+  description String?
+  variables   Json?
+  notes       String?
+
+  @@map("prompts")
+}
+
+model AdStyle {
+  id            String  @id
+  name          String
+  category      String
+  description   String?
+  bestFor       String? @map("best_for")
+  visualLayout  String? @map("visual_layout")
+  psychology    String?
+  mood          String?
+  lighting      String?
+  composition   String?
+  designStyle   String? @map("design_style")
+  prompt        String?
+
+  @@map("ad_styles")
+}

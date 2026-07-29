@@ -16,6 +16,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.local.backup.*
+.env.backup.*
 
 # Editor directories and files
 .vscode/*
@@ -53,5 +55,6 @@ backend/uploads/*.webp
 
 # Backups
 *.sql
+!backend-node/prisma/migrations/**/*.sql
 .vercel
 .env*.local
