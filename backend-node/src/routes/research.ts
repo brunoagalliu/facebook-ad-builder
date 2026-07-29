@@ -112,7 +112,15 @@ router.get(
 router.post(
   "/blacklist",
   asyncHandler(async (req, res) => {
-    const { page_name: pageName, reason } = req.body as { page_name: string; reason?: string };
+    // Python's route declared these as bare scalar function params (not a Pydantic
+    // body model), which FastAPI treats as query params by default — the frontend
+    // sends them as such (axios `params`, null body). Read from req.query, not req.body.
+    const pageName = req.query.page_name as string | undefined;
+    const reason = req.query.reason as string | undefined;
+    if (!pageName) {
+      res.status(422).json({ detail: "page_name is required" });
+      return;
+    }
     const existing = await prisma.pageBlacklist.findUnique({ where: { pageName } });
     if (existing) {
       res.status(400).json({ detail: "Page already blacklisted" });
@@ -147,7 +155,13 @@ router.get(
 router.post(
   "/keyword-blacklist",
   asyncHandler(async (req, res) => {
-    const { keyword, reason } = req.body as { keyword: string; reason?: string };
+    // Same query-param convention as /blacklist above — see the comment there.
+    const keyword = req.query.keyword as string | undefined;
+    const reason = req.query.reason as string | undefined;
+    if (!keyword) {
+      res.status(422).json({ detail: "keyword is required" });
+      return;
+    }
     const lower = keyword.toLowerCase();
     const existing = await prisma.keywordBlacklist.findUnique({ where: { keyword: lower } });
     if (existing) {
@@ -244,7 +258,13 @@ router.post(
 router.post(
   "/verticals",
   asyncHandler(async (req, res) => {
-    const { name, description } = req.body as { name: string; description?: string };
+    // Same query-param convention as /blacklist above — see the comment there.
+    const name = req.query.name as string | undefined;
+    const description = req.query.description as string | undefined;
+    if (!name) {
+      res.status(422).json({ detail: "name is required" });
+      return;
+    }
     const existing = await prisma.vertical.findUnique({ where: { name } });
     if (existing) {
       res.status(400).json({ detail: "Vertical already exists" });
