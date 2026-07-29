@@ -163,13 +163,18 @@ export async function generateVariations(params: {
 
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: 4096,
     system: systemPrompt(),
     messages: [{ role: "user", content: prompt }],
   });
   const block = response.content[0];
   const text = block.type === "text" ? block.text : "";
-  return extractJsonFromText(text);
+  try {
+    return extractJsonFromText(text);
+  } catch (err) {
+    console.error("Copy generation JSON parse failed. stop_reason:", response.stop_reason, "raw text:", text);
+    throw err;
+  }
 }
 
 export async function regenerateField(params: {
