@@ -29,3 +29,23 @@ builder = "NIXPACKS"
 
 [services.deploy]
 startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
+
+# Backend Service (Node.js/TypeScript rewrite — see backend-node/, deployed alongside
+# the Python "backend" service above until the rewrite is fully verified and cut over)
+[[services]]
+name = "backend-node"
+source = "backend-node"
+
+[services.build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend-node/Dockerfile"
+
+[services.deploy]
+# Matches the Dockerfile's CMD exactly (unlike the Python "backend" service above,
+# where railway.toml's startCommand and the Dockerfile CMD disagree on whether
+# migrations run — flagged during the rewrite as a real ambiguity, not reproduced here).
+startCommand = "npx prisma migrate deploy && node dist/index.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

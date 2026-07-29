@@ -46,8 +46,22 @@ repos:
   - repo: local
     hooks:
       - id: eslint
-        name: ESLint
+        name: ESLint (frontend)
         entry: bash -c 'cd frontend && npx eslint --fix'
         language: system
         files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: true
+
+      - id: eslint-backend-node
+        name: ESLint (backend-node)
+        entry: bash -c 'cd backend-node && npx eslint --fix'
+        language: system
+        files: ^backend-node/src/.*\.ts$
+        pass_filenames: true
+
+      - id: prettier-backend-node
+        name: Prettier (backend-node)
+        entry: bash -c 'cd backend-node && npx prettier --write'
+        language: system
+        files: ^backend-node/(src|prisma)/.*\.ts$
         pass_filenames: true

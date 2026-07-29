@@ -59,6 +59,65 @@ jobs:
           flags: backend
         continue-on-error: true
 
+  backend-node-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend-node/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend-node
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend-node
+        run: npm run lint
+
+      - name: Type-check + build
+        working-directory: backend-node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          SECRET_KEY: test-secret-key-for-ci
+        run: npm run build
+
+      - name: Apply migrations
+        working-directory: backend-node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: npx prisma migrate deploy
+
+      - name: Run tests
+        working-directory: backend-node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          SECRET_KEY: test-secret-key-for-ci
+        run: npm test
+        # No Jest suite exists yet (this rewrite was verified with manual/curl-based
+        # checks per phase) — --passWithNoTests keeps this job green as a build/lint
+        # gate until real tests are added, rather than failing on "no tests found."
+
   frontend-tests:
     runs-on: ubuntu-latest
 
@@ -119,7 +178,12 @@ jobs:
         run: pip-audit -r requirements.txt || true
         continue-on-error: true
 
-      - name: Run npm audit
+      - name: Run npm audit (frontend)
         working-directory: frontend
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
+      - name: Run npm audit (backend-node)
+        working-directory: backend-node
         run: npm audit --audit-level=high || true
         continue-on-error: true
