@@ -18,9 +18,12 @@ import { AdBlueprint, AdConcept, BrandData, adBlueprintSchema, adConceptSchema }
 import { extractJsonFromText } from "../utils/json";
 
 // gemini-1.5-flash (the Python original's model) has been deprecated/retired by
-// Google; confirmed against the live ListModels endpoint that this is a current,
-// stable (non-preview) flash-tier multimodal replacement.
-const MODEL = "gemini-2.5-flash";
+// Google, and even gemini-2.5-flash turned out to be blocked for new API keys
+// despite still being listed by ListModels — Google is rotating model versions
+// faster than this app can track by hardcoding one. Using the "-latest" alias so
+// it always resolves to whatever flash-tier model Google currently supports,
+// rather than hardcoding a specific version that will eventually get cut off again.
+const MODEL = "gemini-flash-latest";
 const uploadsDir = path.join(__dirname, "..", "..", "uploads");
 
 const MIME_BY_EXT: Record<string, string> = {
