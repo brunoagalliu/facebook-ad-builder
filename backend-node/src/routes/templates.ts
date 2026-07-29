@@ -1,0 +1,131 @@
+import type { WinningAd } from "@prisma/client";
+import { Router } from "express";
+import multer from "multer";
+import { randomUUID } from "crypto";
+
+import { prisma } from "../core/prisma";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { requireAuth, requirePermission } from "../middleware/auth";
+import { uploadFile } from "../services/storage";
+
+const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+// The original WinningAd Pydantic schema returns snake_case field names matching the
+// DB columns directly — Prisma gives us camelCase, so translate back for API parity.
+function serialize(t: WinningAd) {
+  return {
+    id: t.id,
+    name: t.name,
+    image_url: t.imageUrl,
+    notes: t.notes,
+    tags: t.tags,
+    analysis: t.analysis,
+    recreation_prompt: t.recreationPrompt,
+    topic: t.topic,
+    mood: t.mood,
+    subject_matter: t.subjectMatter,
+    copy_analysis: t.copyAnalysis,
+    product_name: t.productName,
+    category: t.category,
+    design_style: t.designStyle,
+    filename: t.filename,
+    structural_analysis: t.structuralAnalysis,
+    layering: t.layering,
+    template_structure: t.templateStructure,
+    color_palette: t.colorPalette,
+    typography_system: t.typographySystem,
+    copy_patterns: t.copyPatterns,
+    visual_elements: t.visualElements,
+    template_category: t.templateCategory,
+    blueprint_json: t.blueprintJson,
+    blueprint_analyzed_at: t.blueprintAnalyzedAt,
+    created_at: t.createdAt,
+  };
+}
+
+router.get(
+  "",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { search, category, style } = req.query as { search?: string; category?: string; style?: string };
+
+    const where: Record<string, unknown> = {};
+    if (category) where.templateCategory = category;
+    if (style) where.designStyle = style;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { tags: { contains: search, mode: "insensitive" } },
+        { productName: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const templates = await prisma.winningAd.findMany({ where });
+    res.json(templates.map(serialize));
+  })
+);
+
+router.get(
+  "/filters",
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    const categories = await prisma.winningAd.findMany({
+      where: { templateCategory: { not: null } },
+      select: { templateCategory: true },
+      distinct: ["templateCategory"],
+    });
+    const styles = await prisma.winningAd.findMany({
+      where: { designStyle: { not: null } },
+      select: { designStyle: true },
+      distinct: ["designStyle"],
+    });
+    res.json({
+      categories: categories.map((c) => c.templateCategory),
+      styles: styles.map((s) => s.designStyle),
+    });
+  })
+);
+
+router.get(
+  "/:id/preview",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const template = await prisma.winningAd.findUnique({ where: { id: req.params.id } });
+    if (!template) {
+      res.status(404).json({ detail: "Template not found" });
+      return;
+    }
+    res.json(serialize(template));
+  })
+);
+
+// Unlike the Python route (which always wrote to local disk regardless of R2 config —
+// a known inconsistency vs uploads.py), this uses the shared storage service so R2
+// gets used here too when configured.
+router.post(
+  "/upload",
+  requirePermission("templates:write"),
+  upload.array("images"),
+  asyncHandler(async (req, res) => {
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    const savedAds = [];
+    for (const file of files) {
+      const filename = `template_${randomUUID()}_${file.originalname}`;
+      const imageUrl = await uploadFile(file.buffer, filename, file.mimetype);
+      const newAd = await prisma.winningAd.create({
+        data: {
+          name: file.originalname,
+          imageUrl,
+          filename,
+          templateCategory: "Uploaded",
+          designStyle: "Unknown",
+        },
+      });
+      savedAds.push(newAd);
+    }
+    res.json({ message: `Successfully uploaded ${savedAds.length} templates`, ads: savedAds.map(serialize) });
+  })
+);
+
+export default router;

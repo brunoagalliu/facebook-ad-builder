@@ -39,30 +39,42 @@ function hasPermission(user: NonNullable<UserWithRoles>, permissionName: string)
   return user.roles.some((role) => role.permissions.some((p) => p.name === permissionName));
 }
 
-/** Ports get_current_user + get_current_active_user (chained, since nearly every
- * protected route in the Python app depends on the "active" variant). */
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+/** Shared authentication step: decodes the bearer token, loads the user with roles+
+ * permissions, checks is_active, and attaches it to req.user. Sends the appropriate
+ * error response itself and returns null on failure — every exported middleware below
+ * runs this first, so none of them depend on another middleware having run earlier
+ * (mirrors how Python's `require_permission(...)` factory is `Depends(get_current_active_user)`
+ * internally, rather than assuming a separate dependency already ran). */
+async function authenticate(req: Request, res: Response): Promise<NonNullable<UserWithRoles> | null> {
+  if (req.user) return req.user;
+
   const token = extractBearerToken(req);
   if (!token) {
     res.status(401).json({ detail: "Could not validate credentials" });
-    return;
+    return null;
   }
   const payload = decodeAccessToken(token);
   if (!payload) {
     res.status(401).json({ detail: "Could not validate credentials" });
-    return;
+    return null;
   }
   const user = await loadUserWithRoles(payload.sub);
   if (!user) {
     res.status(401).json({ detail: "Could not validate credentials" });
-    return;
+    return null;
   }
   if (!user.isActive) {
     res.status(403).json({ detail: "Inactive user" });
-    return;
+    return null;
   }
   req.user = user;
-  next();
+  return user;
+}
+
+/** Ports get_current_user + get_current_active_user (chained, since nearly every
+ * protected route in the Python app depends on the "active" variant). */
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (await authenticate(req, res)) next();
 }
 
 /** Ports get_optional_user — decodes if present, never raises, just leaves req.user unset. */
@@ -79,8 +91,10 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 }
 
 export function requireRole(roleName: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !hasRole(req.user, roleName)) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = await authenticate(req, res);
+    if (!user) return;
+    if (!hasRole(user, roleName)) {
       res.status(403).json({ detail: "Insufficient permissions" });
       return;
     }
@@ -89,8 +103,10 @@ export function requireRole(roleName: string) {
 }
 
 export function requireAnyRole(roleNames: string[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !roleNames.some((r) => hasRole(req.user!, r))) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = await authenticate(req, res);
+    if (!user) return;
+    if (!roleNames.some((r) => hasRole(user, r))) {
       res.status(403).json({ detail: "Insufficient permissions" });
       return;
     }
@@ -99,8 +115,10 @@ export function requireAnyRole(roleNames: string[]) {
 }
 
 export function requirePermission(permissionName: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !hasPermission(req.user, permissionName)) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = await authenticate(req, res);
+    if (!user) return;
+    if (!hasPermission(user, permissionName)) {
       res.status(403).json({ detail: "Insufficient permissions" });
       return;
     }
@@ -108,8 +126,10 @@ export function requirePermission(permissionName: string) {
   };
 }
 
-export function requireSuperuser(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user || !req.user.isSuperuser) {
+export async function requireSuperuser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const user = await authenticate(req, res);
+  if (!user) return;
+  if (!user.isSuperuser) {
     res.status(403).json({ detail: "Insufficient permissions" });
     return;
   }

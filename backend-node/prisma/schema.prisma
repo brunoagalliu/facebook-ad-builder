@@ -400,7 +400,7 @@ model AdStyle {
   name          String
   category      String
   description   String?
-  bestFor       String? @map("best_for")
+  bestFor       Json?   @map("best_for")
   visualLayout  String? @map("visual_layout")
   psychology    String?
   mood          String?

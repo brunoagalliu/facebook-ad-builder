@@ -5,7 +5,15 @@ import path from "path";
 
 import { settings } from "./core/config";
 import { securityHeaders } from "./middleware/securityHeaders";
+import adStylesRouter from "./routes/adStyles";
 import authRouter from "./routes/auth";
+import brandsRouter from "./routes/brands";
+import dashboardRouter from "./routes/dashboard";
+import productsRouter from "./routes/products";
+import profilesRouter from "./routes/profiles";
+import promptsRouter from "./routes/prompts";
+import templatesRouter from "./routes/templates";
+import uploadsRouter from "./routes/uploads";
 
 // Ports main.py's FastAPI app wiring: CORS, security headers, trust-proxy, static /uploads,
 // and the plain "/" and "/health" routes. Feature routers (auth, brands, research, facebook,
@@ -51,9 +59,16 @@ export function createApp(): express.Express {
   });
 
   app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/brands", brandsRouter);
+  app.use("/api/v1/products", productsRouter);
+  app.use("/api/v1/profiles", profilesRouter);
+  app.use("/api/v1/templates", templatesRouter);
+  app.use("/api/v1/ad-styles", adStylesRouter);
+  app.use("/api/v1/prompts", promptsRouter);
+  app.use("/api/v1/uploads", uploadsRouter);
+  app.use("/api/v1/dashboard", dashboardRouter);
 
   // Remaining feature routers mount here as they're ported, e.g.:
-  // app.use("/api/v1/brands", brandsRouter);
   // app.use("/api/v1/copy-generation", copyGenerationRouter);
   // ... (see backend/app/main.py for the full prefix list to mirror)
 
