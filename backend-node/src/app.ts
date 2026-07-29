@@ -5,6 +5,7 @@ import path from "path";
 
 import { settings } from "./core/config";
 import { securityHeaders } from "./middleware/securityHeaders";
+import authRouter from "./routes/auth";
 
 // Ports main.py's FastAPI app wiring: CORS, security headers, trust-proxy, static /uploads,
 // and the plain "/" and "/health" routes. Feature routers (auth, brands, research, facebook,
@@ -33,6 +34,7 @@ export function createApp(): express.Express {
   );
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
   app.use(securityHeaders);
 
   // main.py mounts local uploads/ at /uploads via StaticFiles, creating the dir if missing
@@ -48,8 +50,9 @@ export function createApp(): express.Express {
     res.json({ status: "healthy" });
   });
 
-  // Feature routers mount here as they're ported, e.g.:
-  // app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/auth", authRouter);
+
+  // Remaining feature routers mount here as they're ported, e.g.:
   // app.use("/api/v1/brands", brandsRouter);
   // app.use("/api/v1/copy-generation", copyGenerationRouter);
   // ... (see backend/app/main.py for the full prefix list to mirror)

@@ -1,10 +1,12 @@
-// Hand-written from the documented Python/SQLAlchemy model inventory (backend/app/models.py)
-// while production DB credentials were unavailable for `prisma db pull`.
+// Hand-written from the documented Python/SQLAlchemy model inventory (backend/app/models.py).
+// This is a fresh Postgres (no production data to preserve/reconcile against), so models
+// marked "best-effort" below are just that project's best-effort reconstruction of a few
+// secondary tables that weren't read verbatim during exploration — adjust freely as this
+// rewrite's own routes/services define what they actually need.
 //
-// PROVISIONAL: models marked "best-effort" below were not read verbatim from models.py during
-// exploration (only referenced indirectly via route/service behavior). Once real production
-// credentials are available, run `prisma db pull` against a staging copy and reconcile this
-// file against the actual introspected schema before trusting it for migrations.
+// Auth (User/Role/Permission/RefreshToken) uses Prisma's implicit many-to-many relations for
+// user_roles/role_permissions rather than explicit join models — simpler code, at the cost of
+// dropping the original schema's per-assignment `created_at` column (not load-bearing).
 
 generator client {
   provider = "prisma-client-js"
