@@ -17,7 +17,10 @@ import { RECONSTRUCTION_PROMPT_TEMPLATE, DECONSTRUCTION_PROMPT } from "../prompt
 import { AdBlueprint, AdConcept, BrandData, adBlueprintSchema, adConceptSchema } from "../schemas/adBlueprint";
 import { extractJsonFromText } from "../utils/json";
 
-const MODEL = "gemini-1.5-flash";
+// gemini-1.5-flash (the Python original's model) has been deprecated/retired by
+// Google; confirmed against the live ListModels endpoint that this is a current,
+// stable (non-preview) flash-tier multimodal replacement.
+const MODEL = "gemini-2.5-flash";
 const uploadsDir = path.join(__dirname, "..", "..", "uploads");
 
 const MIME_BY_EXT: Record<string, string> = {
