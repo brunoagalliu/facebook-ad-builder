@@ -45,6 +45,16 @@ function systemPrompt(): string {
   return SYSTEM_PROMPT_TEMPLATE(getKnowledgeBase());
 }
 
+/** Concatenates all text blocks in the response — `content[0]` isn't reliably the
+ * text block (e.g. a preceding non-text block shifts the index), which is what
+ * caused an earlier bug here: text always came out empty. */
+function extractText(response: { content: Array<{ type: string; text?: string }> }): string {
+  return response.content
+    .filter((block): block is { type: "text"; text: string } => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
+
 interface BrandInput {
   voice?: string;
 }
@@ -167,8 +177,7 @@ export async function generateVariations(params: {
     system: systemPrompt(),
     messages: [{ role: "user", content: prompt }],
   });
-  const block = response.content[0];
-  const text = block.type === "text" ? block.text : "";
+  const text = extractText(response);
   try {
     return extractJsonFromText(text);
   } catch (err) {
@@ -199,7 +208,6 @@ export async function regenerateField(params: {
     system: systemPrompt(),
     messages: [{ role: "user", content: prompt }],
   });
-  const block = response.content[0];
-  const text = block.type === "text" ? block.text : "";
+  const text = extractText(response);
   return text.trim().replace(/^["']|["']$/g, "");
 }
