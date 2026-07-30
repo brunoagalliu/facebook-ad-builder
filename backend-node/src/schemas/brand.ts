@@ -7,18 +7,21 @@ export const brandColorsSchema = z.object({
 });
 
 // Nested product shape used when creating/updating a brand (no brandId — it's implied).
+// .nullish() (not .optional()) on nullable-in-DB fields — BrandForm.jsx round-trips
+// existing records (load -> edit -> resubmit) with no transform in between, so a NULL
+// value already in the DB flows straight back out as a literal `null` in the request.
 const nestedProductSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   product_shots: z.array(z.string()).optional().default([]),
 });
 
 export const brandCreateSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
-  logo: z.string().optional(),
-  voice: z.string().optional(),
+  logo: z.string().nullish(),
+  voice: z.string().nullish(),
   colors: brandColorsSchema,
   products: z.array(nestedProductSchema).optional().default([]),
   profileIds: z.array(z.string()).optional().default([]),

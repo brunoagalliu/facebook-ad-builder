@@ -4,6 +4,7 @@ import { prisma } from "../core/prisma";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { validateBody } from "../middleware/validate";
 import { AdStyleCreateInput, AdStyleUpdateInput, adStyleCreateSchema, adStyleUpdateSchema } from "../schemas/adStyle";
+import { jsonOrDbNull } from "../utils/prismaJson";
 
 // No auth on this router, matching the Python source (ad_styles.py has zero auth deps).
 const router = Router();
@@ -77,7 +78,7 @@ router.post(
         name: body.name,
         category: body.category,
         description: body.description,
-        bestFor: body.best_for,
+        bestFor: jsonOrDbNull(body.best_for),
         visualLayout: body.visual_layout,
         psychology: body.psychology,
         mood: body.mood,
@@ -107,7 +108,7 @@ router.put(
         ...(body.name !== undefined ? { name: body.name } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
-        ...(body.best_for !== undefined ? { bestFor: body.best_for } : {}),
+        ...(body.best_for !== undefined ? { bestFor: jsonOrDbNull(body.best_for) } : {}),
         ...(body.visual_layout !== undefined ? { visualLayout: body.visual_layout } : {}),
         ...(body.psychology !== undefined ? { psychology: body.psychology } : {}),
         ...(body.mood !== undefined ? { mood: body.mood } : {}),

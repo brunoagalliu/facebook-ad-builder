@@ -4,10 +4,10 @@ export const promptCreateSchema = z.object({
   id: z.string(),
   name: z.string(),
   category: z.string(),
-  description: z.string().optional(),
-  variables: z.array(z.string()).optional(),
+  description: z.string().nullish(),
+  variables: z.array(z.string()).nullish(),
   template: z.string(),
-  notes: z.string().optional(),
+  notes: z.string().nullish(),
 });
 export type PromptCreateInput = z.infer<typeof promptCreateSchema>;
 

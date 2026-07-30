@@ -55,7 +55,9 @@ export const validateProductDescription = (description) => {
     if (description && description.length > 500) {
         throw new Error('Product description must be less than 500 characters');
     }
-    return description.trim();
+    // Records loaded from the API can have this as `null` (nullable DB column) rather
+    // than an empty string — .trim() on null/undefined throws before any request is sent.
+    return (description || '').trim();
 };
 
 /**
@@ -67,7 +69,8 @@ export const validateBrandVoice = (voice) => {
     if (voice && voice.length > 500) {
         throw new Error('Brand voice must be less than 500 characters');
     }
-    return voice.trim();
+    // Same reasoning as validateProductDescription — voice can be `null` from the API.
+    return (voice || '').trim();
 };
 
 /**
@@ -81,5 +84,7 @@ export const validateTextInput = (text, maxLength, fieldName = 'Input') => {
     if (text && text.length > maxLength) {
         throw new Error(`${fieldName} must be less than ${maxLength} characters`);
     }
-    return text.trim();
+    // Same reasoning as validateProductDescription — callers can pass a `null` loaded
+    // straight from the API for an optional field.
+    return (text || '').trim();
 };
