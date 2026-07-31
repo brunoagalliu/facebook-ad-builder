@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Link as LinkIcon, Unlink } from 'lucide-react';
+import { X, Plus, Trash2, Unlink } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
 import { validateBrandName, validateHexColor, validateProductName, validateProductDescription, validateBrandVoice, validateTextInput } from '../utils/validation';
@@ -26,12 +26,13 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
         profileIds: []
     });
 
-    const [selectedProductId, setSelectedProductId] = useState('');
-    const [selectedProfileId, setSelectedProfileId] = useState('');
-
-    const handleLinkProduct = () => {
-        if (selectedProductId && !formData.products.find(p => p.id === selectedProductId)) {
-            const product = allProducts.find(p => p.id === selectedProductId);
+    // Linking a product/profile used to be a two-step "pick it, then click the link
+    // button" flow — easy to miss the second click, which silently drops the selection
+    // (nothing is added to formData, so Save persists nothing, with no error shown).
+    // Selecting an option now links it immediately.
+    const handleLinkProduct = (productId) => {
+        if (productId && !formData.products.find(p => p.id === productId)) {
+            const product = allProducts.find(p => p.id === productId);
             if (product) {
                 setFormData({
                     ...formData,
@@ -41,7 +42,6 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                         description: product.description
                     }]
                 });
-                setSelectedProductId('');
             }
         }
     };
@@ -53,13 +53,12 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
         });
     };
 
-    const handleLinkProfile = () => {
-        if (selectedProfileId && !formData.profileIds?.includes(selectedProfileId)) {
+    const handleLinkProfile = (profileId) => {
+        if (profileId && !formData.profileIds?.includes(profileId)) {
             setFormData({
                 ...formData,
-                profileIds: [...(formData.profileIds || []), selectedProfileId]
+                profileIds: [...(formData.profileIds || []), profileId]
             });
-            setSelectedProfileId('');
         }
     };
 
@@ -182,8 +181,8 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                         <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                             <div className="flex gap-2">
                                 <select
-                                    value={selectedProductId}
-                                    onChange={(e) => setSelectedProductId(e.target.value)}
+                                    value=""
+                                    onChange={(e) => handleLinkProduct(e.target.value)}
                                     className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
                                 >
                                     <option value="">Select a product to assign...</option>
@@ -196,14 +195,6 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         ))
                                     }
                                 </select>
-                                <button
-                                    type="button"
-                                    onClick={handleLinkProduct}
-                                    disabled={!selectedProductId}
-                                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                    <LinkIcon size={20} />
-                                </button>
                             </div>
 
                             {formData.products.length > 0 && (
@@ -240,8 +231,8 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                         <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                             <div className="flex gap-2">
                                 <select
-                                    value={selectedProfileId}
-                                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                                    value=""
+                                    onChange={(e) => handleLinkProfile(e.target.value)}
                                     className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
                                 >
                                     <option value="">Select a profile to link...</option>
@@ -254,14 +245,6 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         ))
                                     }
                                 </select>
-                                <button
-                                    type="button"
-                                    onClick={handleLinkProfile}
-                                    disabled={!selectedProfileId}
-                                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                    <LinkIcon size={20} />
-                                </button>
                             </div>
 
                             {(formData.profileIds || []).length > 0 && (

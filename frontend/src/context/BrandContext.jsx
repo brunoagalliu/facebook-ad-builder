@@ -1,8 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { useToast } from './ToastContext';
 
 const BrandContext = createContext();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Every CRUD call below used to ignore response.ok entirely — a failed save (permission
+// denied, validation error, etc.) would silently reload the unchanged data with no
+// indication anything went wrong. This turns a non-OK response into a real thrown Error
+// carrying the API's detail message, so callers' catch blocks can surface it.
+async function throwIfNotOk(response, fallbackMessage) {
+    if (!response.ok) {
+        let detail = fallbackMessage;
+        try {
+            const data = await response.json();
+            if (typeof data?.detail === 'string') detail = data.detail;
+        } catch {
+            // response body wasn't JSON — stick with the fallback message
+        }
+        throw new Error(detail);
+    }
+}
 
 export const useBrands = () => {
     const context = useContext(BrandContext);
@@ -19,6 +37,7 @@ export const BrandProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     const { authFetch, isAuthenticated, loading: authLoading } = useAuth();
+    const { showError } = useToast();
 
     // Load data from API
     const loadData = useCallback(async () => {
@@ -79,43 +98,49 @@ export const BrandProvider = ({ children }) => {
                 id: crypto.randomUUID()
             };
 
-            await authFetch(`${API_URL}/brands`, {
+            const response = await authFetch(`${API_URL}/brands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newBrand)
             });
+            await throwIfNotOk(response, 'Failed to create brand');
 
             await loadData();
         } catch (error) {
             console.error('Error adding brand:', error);
+            showError(error.message || 'Failed to create brand');
             throw error;
         }
     };
 
     const updateBrand = async (id, updatedBrand) => {
         try {
-            await authFetch(`${API_URL}/brands/${id}`, {
+            const response = await authFetch(`${API_URL}/brands/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedBrand)
             });
+            await throwIfNotOk(response, 'Failed to save brand');
 
             await loadData();
         } catch (error) {
             console.error('Error updating brand:', error);
+            showError(error.message || 'Failed to save brand');
             throw error;
         }
     };
 
     const deleteBrand = async (id) => {
         try {
-            await authFetch(`${API_URL}/brands/${id}`, {
+            const response = await authFetch(`${API_URL}/brands/${id}`, {
                 method: 'DELETE'
             });
+            await throwIfNotOk(response, 'Failed to delete brand');
 
             await loadData();
         } catch (error) {
             console.error('Error deleting brand:', error);
+            showError(error.message || 'Failed to delete brand');
             throw error;
         }
     };
@@ -180,44 +205,50 @@ export const BrandProvider = ({ children }) => {
                 id: crypto.randomUUID()
             };
 
-            await authFetch(`${API_URL}/profiles`, {
+            const response = await authFetch(`${API_URL}/profiles`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newProfile)
             });
+            await throwIfNotOk(response, 'Failed to create profile');
 
             await loadData();
             return newProfile;
         } catch (error) {
             console.error('Error adding profile:', error);
+            showError(error.message || 'Failed to create profile');
             throw error;
         }
     };
 
     const updateProfile = async (id, updatedProfile) => {
         try {
-            await authFetch(`${API_URL}/profiles/${id}`, {
+            const response = await authFetch(`${API_URL}/profiles/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedProfile)
             });
+            await throwIfNotOk(response, 'Failed to save profile');
 
             await loadData();
         } catch (error) {
             console.error('Error updating profile:', error);
+            showError(error.message || 'Failed to save profile');
             throw error;
         }
     };
 
     const deleteProfile = async (id) => {
         try {
-            await authFetch(`${API_URL}/profiles/${id}`, {
+            const response = await authFetch(`${API_URL}/profiles/${id}`, {
                 method: 'DELETE'
             });
+            await throwIfNotOk(response, 'Failed to delete profile');
 
             await loadData();
         } catch (error) {
             console.error('Error deleting profile:', error);
+            showError(error.message || 'Failed to delete profile');
             throw error;
         }
     };
