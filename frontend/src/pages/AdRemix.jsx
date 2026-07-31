@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, Sparkles, Check, Image, FileText, Briefcase, Package, Users } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
@@ -12,12 +13,15 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function AdRemix() {
     const { brands, customerProfiles } = useBrands();
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const { authFetch } = useAuth();
+    const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [blueprint, setBlueprint] = useState(null);
     const [adConcept, setAdConcept] = useState(null);
+    const [generatingImage, setGeneratingImage] = useState(false);
+    const [savedAd, setSavedAd] = useState(null);
 
     const [wizardData, setWizardData] = useState({
         template: null,
@@ -99,6 +103,68 @@ export default function AdRemix() {
             showError('Failed to reconstruct ad. Please try again.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGenerateAndSaveImage = async () => {
+        setGeneratingImage(true);
+        try {
+            const response = await authFetch(`${API_URL}/generated-ads/generate-image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template: wizardData.template,
+                    brand: wizardData.brand,
+                    product: wizardData.product,
+                    copy: {
+                        headline: adConcept.headline_remix,
+                        body: adConcept.body_copy,
+                        cta: adConcept.cta_button
+                    },
+                    count: 1,
+                    imageSizes: [{ width: 1080, height: 1080, name: 'Square' }],
+                    resolution: '1K',
+                    customPrompt: adConcept.image_generation_prompt
+                })
+            });
+
+            if (!response.ok) throw new Error('Image generation failed');
+
+            const data = await response.json();
+            const image = (data.images || [])[0];
+            if (!image) throw new Error('No image returned');
+
+            const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const adToSave = {
+                id: `ga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                brandId: wizardData.brand?.id,
+                productId: wizardData.product?.id,
+                templateId: wizardData.template?.id,
+                imageUrl: image.url,
+                headline: adConcept.headline_remix,
+                body: adConcept.body_copy,
+                cta: adConcept.cta_button,
+                sizeName: image.size,
+                dimensions: image.dimensions,
+                prompt: image.prompt,
+                adBundleId: bundleId
+            };
+
+            const saveResponse = await authFetch(`${API_URL}/generated-ads/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ads: [adToSave] })
+            });
+
+            if (!saveResponse.ok) throw new Error('Failed to save generated ad');
+
+            setSavedAd({ ...adToSave, imageUrl: image.url });
+            showSuccess('Ad image generated and saved to Generated Ads');
+        } catch (error) {
+            console.error('Generate & save error:', error);
+            showError('Failed to generate and save the ad image. Please try again.');
+        } finally {
+            setGeneratingImage(false);
         }
     };
 
@@ -345,6 +411,45 @@ export default function AdRemix() {
                                     {adConcept.image_generation_prompt}
                                 </p>
                             </div>
+
+                            {!savedAd && (
+                                <div className="text-center">
+                                    <button
+                                        onClick={handleGenerateAndSaveImage}
+                                        disabled={generatingImage}
+                                        className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+                                    >
+                                        {generatingImage ? (
+                                            <>
+                                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                                                Generating Image...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Image size={20} />
+                                                Generate Image & Save
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
+                            {savedAd && (
+                                <div className="bg-white border-2 border-purple-200 rounded-xl p-6 text-center">
+                                    <h4 className="font-bold text-gray-900 mb-3">Saved to Generated Ads</h4>
+                                    <img
+                                        src={savedAd.imageUrl}
+                                        alt="Generated ad"
+                                        className="max-w-sm mx-auto rounded-lg border border-gray-300 mb-4"
+                                    />
+                                    <button
+                                        onClick={() => navigate('/generated-ads')}
+                                        className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                                    >
+                                        View in Generated Ads
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
