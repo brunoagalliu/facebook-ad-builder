@@ -178,23 +178,41 @@ export default function ImageAds() {
                 })
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                throw new Error('Image generation failed');
+                // The backend now fails the whole request when every image errors
+                // (e.g. a Fal.ai billing/auth issue) instead of silently returning
+                // placeholder "success" images — surface its actual detail message.
+                throw new Error(data.detail || 'Image generation failed');
             }
 
-            const data = await response.json();
             console.log('📸 Image generation response:', data);
+
+            // A partial failure (some sizes/variations succeeded, others didn't) still
+            // comes back as a 200 with per-image `error` fields — only ones with a real
+            // url are usable.
+            const succeeded = (data.images || []).filter(img => img.url && !img.error);
+            const failedCount = (data.images || []).length - succeeded.length;
+
+            if (succeeded.length === 0) {
+                throw new Error('Image generation failed for all requested images.');
+            }
 
             // Generate a unique bundle ID for this set of images
             const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
             // Add bundle ID to images
-            const imagesWithBundle = (data.images || []).map(img => ({
+            const imagesWithBundle = succeeded.map(img => ({
                 ...img,
                 adBundleId: bundleId
             }));
 
             setGeneratedImages(imagesWithBundle);
+
+            if (failedCount > 0) {
+                showError(`${failedCount} of ${data.images.length} image(s) failed to generate and were skipped.`);
+            }
 
             // Save generated ads to database
             try {
@@ -226,13 +244,13 @@ export default function ImageAds() {
                 console.log('✅ Saved generated ads to database with bundle ID:', bundleId);
             } catch (saveError) {
                 console.error('Failed to save ads to database:', saveError);
-                // Don't fail the whole operation if saving fails
+                showError('Images generated but failed to save to Generated Ads. They will not appear in the gallery.');
             }
 
             setCurrentStep(10); // Move to image result step
         } catch (error) {
             console.error('Image generation error:', error);
-            showError('Failed to generate images. Please try again.');
+            showError(error.message || 'Failed to generate images. Please try again.');
         } finally {
             setGenerating(false);
         }

@@ -128,11 +128,16 @@ export default function AdRemix() {
                 })
             });
 
-            if (!response.ok) throw new Error('Image generation failed');
+            const data = await response.json().catch(() => ({}));
 
-            const data = await response.json();
-            const image = (data.images || [])[0];
-            if (!image) throw new Error('No image returned');
+            if (!response.ok) {
+                // Backend fails the whole request when every image errors (e.g. a
+                // Fal.ai billing/auth issue) and returns the real cause in `detail`.
+                throw new Error(data.detail || 'Image generation failed');
+            }
+
+            const image = (data.images || []).find(img => img.url && !img.error);
+            if (!image) throw new Error('Image generation failed for all requested images.');
 
             const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const adToSave = {
@@ -162,7 +167,7 @@ export default function AdRemix() {
             showSuccess('Ad image generated and saved to Generated Ads');
         } catch (error) {
             console.error('Generate & save error:', error);
-            showError('Failed to generate and save the ad image. Please try again.');
+            showError(error.message || 'Failed to generate and save the ad image. Please try again.');
         } finally {
             setGeneratingImage(false);
         }

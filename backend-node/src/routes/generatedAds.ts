@@ -15,8 +15,14 @@ router.post(
   requirePermission("ads:write"),
   validateBody(imageGenerationRequestSchema),
   asyncHandler(async (req, res) => {
-    const images = await generateImages(req.body);
-    res.json({ images });
+    try {
+      const images = await generateImages(req.body);
+      res.json({ images });
+    } catch (err) {
+      // A total generation failure (e.g. Fal.ai account/billing issue) — surface the
+      // real cause instead of letting it fall through to the generic 500 handler.
+      res.status(502).json({ detail: (err as Error).message || "Image generation failed" });
+    }
   })
 );
 

@@ -67,6 +67,18 @@ export interface GeneratedImage {
   size: string;
   dimensions: string;
   prompt: string;
+  error?: string;
+}
+
+/** Fal's ApiError shape carries the real cause in `body.detail` (e.g. "User is locked.
+ * Reason: Exhausted balance...") — falling back to err.message loses that entirely. */
+function extractFalErrorMessage(err: unknown): string {
+  if (err && typeof err === "object" && "body" in err) {
+    const body = (err as { body?: { detail?: string } }).body;
+    if (body?.detail) return body.detail;
+  }
+  if (err instanceof Error) return err.message;
+  return "Image generation failed";
 }
 
 export async function generateImages(request: ImageGenerationRequestInput): Promise<GeneratedImage[]> {
@@ -84,7 +96,6 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
       const sizeName = (size.name as string) ?? "Square";
 
       const prompt = buildComprehensivePrompt(request);
-      let imageUrl: string;
 
       if (useFal) {
         try {
@@ -107,19 +118,31 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
           const result = await fal.subscribe(modelId as never, { input: args as never });
           const data = result.data as { images: { url: string }[] };
           const externalUrl = data.images[0].url;
-          imageUrl = await downloadAndSaveImage(externalUrl, "generated");
+          const imageUrl = await downloadAndSaveImage(externalUrl, "generated");
+          images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
         } catch (err) {
           console.error("Fal.ai generation failed:", err);
-          const productName = (request.product?.name as string) ?? "Product";
-          imageUrl = `https://placehold.co/${width}x${height}/png?text=${encodeURIComponent(productName)}+Error`;
+          images.push({
+            url: "",
+            size: sizeName,
+            dimensions: `${width}x${height}`,
+            prompt,
+            error: extractFalErrorMessage(err),
+          });
         }
       } else {
         const productName = (request.product?.name as string) ?? "Product";
-        imageUrl = `https://placehold.co/${width}x${height}/png?text=${encodeURIComponent(productName)}+${i + 1}`;
+        const imageUrl = `https://placehold.co/${width}x${height}/png?text=${encodeURIComponent(productName)}+${i + 1}`;
+        images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
       }
-
-      images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
     }
+  }
+
+  // A total failure (every image errored) is a real request failure, not a partial
+  // result — let it propagate as an error instead of returning a fake "success" full
+  // of unusable placeholder images.
+  if (images.length > 0 && images.every((img) => img.error)) {
+    throw new Error(images[0].error);
   }
 
   return images;
