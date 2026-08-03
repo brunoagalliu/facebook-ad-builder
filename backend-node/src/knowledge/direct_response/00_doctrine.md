@@ -24,4 +24,6 @@ Every variation this engine produces must have an answer to: **"why should they 
 - `04_offer_and_cta.md` — making the action itself feel low-risk and immediate.
 - `05_objection_handling.md` — killing the hesitation that stops a click before it happens.
 
+Files numbered `06` and above are a rotating set of additional playbooks (angle selection, narrative flow, proof construction, craft standards) — a subset is included below alongside this core set on any given call. Treat whichever ones are present the same way as 01-05: techniques that serve this mandate, never a substitute for it.
+
 Every generated variation should be checked against this file last, as a filter: if it fails the "why act now" test, it gets rewritten — not softened, rewritten.

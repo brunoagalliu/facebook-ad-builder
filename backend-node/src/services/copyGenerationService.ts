@@ -19,17 +19,54 @@ ${knowledgeBase}
 
 Output ONLY valid JSON or plain text exactly as instructed in the user message — no markdown code fences, no commentary before or after.`;
 
-let cachedKnowledgeBase: string | null = null;
+// Files 00-05 are the core mandate + universal execution mechanics — always included.
+// Files numbered 06+ are a growing pool of additional playbooks (angle selection,
+// narrative flow, proof construction, craft standards, and whatever gets added next).
+// Concatenating the whole pool into every call would keep bloating the system prompt
+// as the pool grows and dilute focus across more material than any one generation
+// needs, so only a random subset of the pool rides along with the core each call —
+// this also reinforces buildVariationsPrompt's "different framework per variation"
+// instruction by literally varying which playbooks are available to draw from.
+const CORE_FILE_LIMIT = 6;
+const ROTATING_POOL_SAMPLE_SIZE = 2;
 
-export function getKnowledgeBase(): string {
-  if (cachedKnowledgeBase === null) {
+let knowledgeFilesCache: Map<string, string> | null = null;
+
+function loadKnowledgeFiles(): Map<string, string> {
+  if (!knowledgeFilesCache) {
     const files = fs
       .readdirSync(KNOWLEDGE_DIR)
       .filter((f) => f.endsWith(".md"))
       .sort();
-    cachedKnowledgeBase = files.map((f) => fs.readFileSync(path.join(KNOWLEDGE_DIR, f), "utf-8")).join("\n\n---\n\n");
+    knowledgeFilesCache = new Map(files.map((f) => [f, fs.readFileSync(path.join(KNOWLEDGE_DIR, f), "utf-8")]));
   }
-  return cachedKnowledgeBase;
+  return knowledgeFilesCache;
+}
+
+function isCoreFile(filename: string): boolean {
+  const n = parseInt(filename.slice(0, 2), 10);
+  return Number.isFinite(n) && n < CORE_FILE_LIMIT;
+}
+
+function sampleWithoutReplacement<T>(items: T[], count: number): T[] {
+  const pool = [...items];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
+
+export function getKnowledgeBase(): string {
+  const files = loadKnowledgeFiles();
+  const names = [...files.keys()];
+  const core = names.filter(isCoreFile);
+  const rotatingPool = names.filter((n) => !isCoreFile(n));
+  const rotating = sampleWithoutReplacement(rotatingPool, Math.min(ROTATING_POOL_SAMPLE_SIZE, rotatingPool.length));
+
+  return [...core, ...rotating]
+    .map((n) => files.get(n) as string)
+    .join("\n\n---\n\n");
 }
 
 let client: Anthropic | null = null;
