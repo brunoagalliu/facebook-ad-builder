@@ -28,7 +28,11 @@ Output ONLY valid JSON or plain text exactly as instructed in the user message â
 // this also reinforces buildVariationsPrompt's "different framework per variation"
 // instruction by literally varying which playbooks are available to draw from.
 const CORE_FILE_LIMIT = 6;
-const ROTATING_POOL_SAMPLE_SIZE = 2;
+// Bumped from 2 now that the rotating pool has grown to 15 files (06-20) â€” 2 would mean
+// any given file only shows up in ~13% of calls, too sparse for the model to reliably
+// draw on newer material. 3 keeps the odds reasonable without letting prompt size scale
+// linearly with however large the pool eventually gets.
+const ROTATING_POOL_SAMPLE_SIZE = 3;
 
 let knowledgeFilesCache: Map<string, string> | null = null;
 
