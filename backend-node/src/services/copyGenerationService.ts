@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 
 import { settings } from "../core/config";
+import { buildSwipeQueryText, findRelevantSwipeExamples, formatSwipeExamplesForPrompt } from "./swipeFileService";
 import { extractJsonFromText } from "../utils/json";
 
 const KNOWLEDGE_DIR = path.join(__dirname, "..", "knowledge", "direct_response");
@@ -123,7 +124,8 @@ export function buildVariationsPrompt(
   profile: ProfileInput,
   campaignDetails: CampaignDetailsInput,
   template?: TemplateInput,
-  variationCount = 3
+  variationCount = 3,
+  swipeSection = ""
 ): string {
   return `Generate ${variationCount} variations of ad copy for a Facebook/Instagram ad campaign.
 
@@ -143,7 +145,7 @@ CAMPAIGN DETAILS:
 - Key Messaging: ${campaignDetails.messaging ?? ""}
 
 TEMPLATE STYLE: ${template?.design_style ?? "Modern and clean"}
-
+${swipeSection ? `\n${swipeSection}\n` : ""}
 Each of the ${variationCount} variations must:
 1. Pass the direct-response mandate in your doctrine — a real reason to act now, not just brand messaging
 2. Match the brand voice in tone only (voice never overrides the doctrine's urgency/specificity requirements)
@@ -201,16 +203,26 @@ export async function generateVariations(params: {
   variationCount?: number;
   customPrompt?: string;
 }): Promise<unknown> {
-  const prompt =
-    params.customPrompt ??
-    buildVariationsPrompt(
+  let prompt = params.customPrompt;
+  if (!prompt) {
+    // Swipe examples are specific to this generation's product/audience, not universal
+    // doctrine, so they ride in the user message rather than the (mostly-static) system
+    // prompt. A custom prompt is a full override of this message, so it skips retrieval
+    // entirely rather than trying to splice examples into caller-supplied text.
+    const swipeQuery = buildSwipeQueryText(params.product, params.profile);
+    const swipeExamples = await findRelevantSwipeExamples(swipeQuery);
+    const swipeSection = formatSwipeExamplesForPrompt(swipeExamples);
+
+    prompt = buildVariationsPrompt(
       params.brand,
       params.product,
       params.profile,
       params.campaignDetails,
       params.template,
-      params.variationCount ?? 3
+      params.variationCount ?? 3,
+      swipeSection
     );
+  }
 
   const response = await getClient().messages.create({
     model: MODEL,
