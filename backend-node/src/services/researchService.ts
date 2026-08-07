@@ -4,10 +4,12 @@ import type { Prisma } from "@prisma/client";
 import crypto from "crypto";
 
 import { prisma } from "../core/prisma";
+import { searchAdplexityAds } from "./adplexityService";
 import { ScrapedAdCreate, searchAds } from "./scraperService";
 
 export interface AdSearchRequestInput {
   query: string;
+  source?: "facebook" | "adplexity" | null;
   platform?: string;
   limit: number;
   country: string;
@@ -19,24 +21,22 @@ export interface AdSearchRequestInput {
   schedule_config?: Record<string, unknown>;
 }
 
+function runSearch(request: AdSearchRequestInput): Promise<ScrapedAdCreate[]> {
+  const search = request.source === "adplexity" ? searchAdplexityAds : searchAds;
+  return search(request.query, request.limit, request.country, request.offset, request.exclude_ids, request.negative_keywords);
+}
+
 export function computeContentHash(ad: ScrapedAdCreate): string {
   const content = `${ad.brand_name ?? ""}|${ad.headline ?? ""}|${ad.ad_copy ?? ""}|${ad.cta_text ?? ""}`;
   return crypto.createHash("sha256").update(content, "utf-8").digest("hex");
 }
 
 export async function searchAdsWithoutSaving(request: AdSearchRequestInput): Promise<ScrapedAdCreate[]> {
-  return searchAds(request.query, request.limit, request.country, request.offset, request.exclude_ids, request.negative_keywords);
+  return runSearch(request);
 }
 
 export async function searchAndSave(request: AdSearchRequestInput) {
-  const ads = await searchAds(
-    request.query,
-    request.limit,
-    request.country,
-    request.offset,
-    request.exclude_ids,
-    request.negative_keywords
-  );
+  const ads = await runSearch(request);
 
   let adsNew = 0;
   let adsDuplicate = 0;

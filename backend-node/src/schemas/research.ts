@@ -6,6 +6,7 @@ import { z } from "zod";
 // `vertical_id: selectedVertical?.id || null` and `schedule_config: null` literally.
 export const adSearchRequestSchema = z.object({
   query: z.string(),
+  source: z.enum(["facebook", "adplexity"]).nullish().default("facebook"),
   platform: z.string().nullish().default("facebook"),
   limit: z.number().nullish().default(10),
   country: z.string().nullish().default("US"),

@@ -12,6 +12,12 @@ const COUNTRIES = [
     { code: 'AU', name: 'Australia' },
 ];
 
+// AdPlexity charges 1 base credit per API call + 1 credit per result actually
+// returned (confirmed empirically: count=1 -> 2 credits, count=50 -> 51 credits).
+// The backend batches in chunks of up to 100 results per call, so this estimates
+// the worst case (every batch fully populated) — actual cost may be lower.
+const estimateAdplexityCredits = (limit) => Math.ceil(limit / 100) + limit;
+
 const LIMIT_OPTIONS = [
     { value: 100, label: '100 ads', apiCalls: 1 },
     { value: 300, label: '300 ads', apiCalls: 3 },
@@ -26,6 +32,7 @@ const Research = () => {
     const { showSuccess, showError, showInfo } = useToast();
     const location = useLocation();
     const [query, setQuery] = useState('');
+    const [source, setSource] = useState('facebook');
     const [country, setCountry] = useState('US');
     const [negativeKeywords, setNegativeKeywords] = useState('');
     const [limit, setLimit] = useState(300);
@@ -207,9 +214,13 @@ const Research = () => {
         }
 
         setLoading(true);
-        const apiCalls = LIMIT_OPTIONS.find(o => o.value === limit)?.apiCalls || 1;
 
-        setProgressMessage(`Fetching ads from Facebook (${apiCalls} API call${apiCalls > 1 ? 's' : ''})...`);
+        if (source === 'adplexity') {
+            setProgressMessage(`Fetching ads from AdPlexity (~${estimateAdplexityCredits(limit)} credits)...`);
+        } else {
+            const apiCalls = LIMIT_OPTIONS.find(o => o.value === limit)?.apiCalls || 1;
+            setProgressMessage(`Fetching ads from Facebook (${apiCalls} API call${apiCalls > 1 ? 's' : ''})...`);
+        }
         showInfo('Starting scrape...');
 
         try {
@@ -222,6 +233,7 @@ const Research = () => {
 
             const result = await searchAndSave({
                 query,
+                source,
                 platform: 'facebook',
                 limit,
                 country,
@@ -675,6 +687,31 @@ const Research = () => {
                     <div className="bg-white rounded-lg border border-gray-200 p-6">
                         <h3 className="text-lg font-semibold mb-4">New Search</h3>
                         <form onSubmit={handleScrape} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                        <input
+                                            type="radio"
+                                            name="source"
+                                            value="facebook"
+                                            checked={source === 'facebook'}
+                                            onChange={() => setSource('facebook')}
+                                        />
+                                        Facebook Ad Library (free)
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                        <input
+                                            type="radio"
+                                            name="source"
+                                            value="adplexity"
+                                            checked={source === 'adplexity'}
+                                            onChange={() => setSource('adplexity')}
+                                        />
+                                        AdPlexity (uses credits)
+                                    </label>
+                                </div>
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <input
                                     type="text"
@@ -728,15 +765,26 @@ const Research = () => {
                                 </select>
                             </div>
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-700">
-                                        API Calls: <strong>{LIMIT_OPTIONS.find(o => o.value === limit)?.apiCalls || 1}</strong>
-                                    </span>
-                                    <span className="text-gray-500">
-                                        (Facebook Ads Library API limit: 300 ads/call)
-                                    </span>
-                                </div>
-                                {rateLimit && (
+                                {source === 'adplexity' ? (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-700">
+                                            Estimated cost: <strong>~{estimateAdplexityCredits(limit)} credits</strong>
+                                        </span>
+                                        <span className="text-gray-500">
+                                            (1 base + 1 per result returned, may be less if fewer results exist)
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-700">
+                                            API Calls: <strong>{LIMIT_OPTIONS.find(o => o.value === limit)?.apiCalls || 1}</strong>
+                                        </span>
+                                        <span className="text-gray-500">
+                                            (Facebook Ads Library API limit: 300 ads/call)
+                                        </span>
+                                    </div>
+                                )}
+                                {source === 'facebook' && rateLimit && (
                                     <div className="flex items-center justify-between pt-2 border-t border-blue-200">
                                         <span className="text-gray-700">
                                             Rate Limit: <strong className={rateLimit.remaining < 50 ? 'text-red-600' : 'text-green-600'}>

@@ -46,6 +46,8 @@ export const settings = {
   FACEBOOK_APP_SECRET: process.env.FACEBOOK_APP_SECRET ?? "",
   FACEBOOK_ADS_LIBRARY_TOKEN: process.env.FACEBOOK_ADS_LIBRARY_TOKEN ?? "",
 
+  ADPLEXITY_API_KEY: process.env.ADPLEXITY_API_KEY ?? "",
+
   FB_SCRAPER_EMAIL: process.env.FB_SCRAPER_EMAIL ?? "",
   FB_SCRAPER_PASSWORD: process.env.FB_SCRAPER_PASSWORD ?? "",
 
