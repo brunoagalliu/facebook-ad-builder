@@ -9,12 +9,18 @@ import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Kie.ai's sora-2-pro-storyboard model: each poll costs one request, so this trades
+// Kie.ai's bytedance/seedance-2 model: each poll costs one request, so this trades
 // promptness for not hammering the API — mirrors facebookService.ts's
 // waitForVideoReady polling defaults (10s interval, 600s/10min timeout) since video
 // generation is a comparably slow async job.
 const POLL_INTERVAL_MS = 10_000;
 const POLL_TIMEOUT_MS = 600_000;
+
+// Seedance generates one continuous clip per call, 4-15s total (no multi-shot API) —
+// scene durations are summed and clamped server-side, but the picker only offers
+// values that keep 1-3 scenes comfortably within that ceiling.
+const SCENE_DURATION_OPTIONS = [3, 5, 7, 10, 15];
+const MAX_TOTAL_DURATION = 15;
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,12 +40,10 @@ export default function VideoAds() {
 
     // Video-specific creative inputs, separate from wizardData since they're only
     // relevant to steps 4-5, not the shared brand/product/profile selection steps.
-    const [hasExistingCharacter, setHasExistingCharacter] = useState(false);
-    const [characterTag, setCharacterTag] = useState('');
     const [character, setCharacter] = useState({ name: '', age: '', ethnicity: '', gender: '', description: '' });
     const [location, setLocation] = useState('');
     const [aspectRatio, setAspectRatio] = useState('portrait');
-    const [scenes, setScenes] = useState([{ durationSeconds: 15, action: '' }]);
+    const [scenes, setScenes] = useState([{ durationSeconds: 10, action: '' }]);
 
     const [generating, setGenerating] = useState(false);
     const [generationState, setGenerationState] = useState(null); // 'waiting' | 'queuing' | 'generating' | 'success' | 'fail'
@@ -105,8 +109,10 @@ export default function VideoAds() {
 
     const addScene = () => {
         if (scenes.length >= 3) return;
-        setScenes(prev => [...prev, { durationSeconds: 10, action: '' }]);
+        setScenes(prev => [...prev, { durationSeconds: 3, action: '' }]);
     };
+
+    const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
 
     const removeScene = (index) => {
         if (scenes.length <= 1) return;
@@ -153,15 +159,13 @@ export default function VideoAds() {
                     brand: wizardData.brand,
                     product: wizardData.product,
                     productShots: wizardData.useProductShots ? (wizardData.product?.product_shots || []) : [],
-                    character: hasExistingCharacter
-                        ? { tag: characterTag }
-                        : {
-                            name: character.name || undefined,
-                            age: character.age || undefined,
-                            ethnicity: character.ethnicity || undefined,
-                            gender: character.gender || undefined,
-                            description: character.description || undefined,
-                        },
+                    character: {
+                        name: character.name || undefined,
+                        age: character.age || undefined,
+                        ethnicity: character.ethnicity || undefined,
+                        gender: character.gender || undefined,
+                        description: character.description || undefined,
+                    },
                     location: location || undefined,
                     scenes,
                     aspectRatio,
@@ -315,39 +319,20 @@ export default function VideoAds() {
                     <div className="space-y-6">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900 mb-1">Character</h3>
-                            <p className="text-sm text-gray-500 mb-3">Reuse a character you've already created in Sora, or describe a new one for the AI to render.</p>
-                            <label className="flex items-center gap-2 mb-3 text-sm text-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={hasExistingCharacter}
-                                    onChange={(e) => setHasExistingCharacter(e.target.checked)}
-                                    className="w-4 h-4 text-amber-600 rounded"
+                            <p className="text-sm text-gray-500 mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                                <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                                <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                                <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                                <textarea
+                                    value={character.description}
+                                    onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Additional detail: hair, features, clothing, voice, mannerisms…"
+                                    rows={2}
+                                    className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                 />
-                                I already have a Sora character handle (e.g. @icyflame313)
-                            </label>
-                            {hasExistingCharacter ? (
-                                <input
-                                    type="text"
-                                    value={characterTag}
-                                    onChange={(e) => setCharacterTag(e.target.value)}
-                                    placeholder="@yourcharacter"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                                />
-                            ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                    <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                    <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                    <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                    <textarea
-                                        value={character.description}
-                                        onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
-                                        placeholder="Additional detail: hair, features, clothing, voice, mannerisms…"
-                                        rows={2}
-                                        className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                                    />
-                                </div>
-                            )}
+                            </div>
                         </div>
 
                         <div>
@@ -391,7 +376,10 @@ export default function VideoAds() {
                                     <Plus size={16} /> Add scene
                                 </button>
                             </div>
-                            <p className="text-sm text-gray-500 mb-3">Up to 3 scenes, 25s total. Describe what the character does and says in each.</p>
+                            <p className="text-sm text-gray-500 mb-1">Up to 3 scenes, {MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.</p>
+                            <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-gray-400'}`}>
+                                {totalDuration}s / {MAX_TOTAL_DURATION}s{totalDuration > MAX_TOTAL_DURATION ? ' — will be trimmed to fit' : ''}
+                            </p>
                             <div className="space-y-3">
                                 {scenes.map((scene, i) => (
                                     <div key={i} className="border border-gray-200 rounded-lg p-3">
@@ -403,7 +391,7 @@ export default function VideoAds() {
                                                     onChange={(e) => updateScene(i, 'durationSeconds', Number(e.target.value))}
                                                     className="text-sm border border-gray-300 rounded px-2 py-1"
                                                 >
-                                                    {[5, 10, 15].map((d) => <option key={d} value={d}>{d}s</option>)}
+                                                    {SCENE_DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d}s</option>)}
                                                 </select>
                                             </div>
                                             {scenes.length > 1 && (

@@ -1,14 +1,27 @@
 /**
- * AI UGC video generation via Kie.ai's Sora 2 storyboard model. The prompt structure
- * (iPhone-selfie framing, per-scene cinematography boilerplate, UGC authenticity
+ * AI UGC video generation via Kie.ai's Bytedance Seedance 2.0 model. The prompt
+ * structure (iPhone-selfie framing, cinematography boilerplate, UGC authenticity
  * keywords, quality-control negative list, and the "reference a proven winner, then
  * iterate" character/product fidelity approach) is distilled from a course on AI UGC
  * ad production — see knowledge/direct_response/21_hook_iteration_from_reference.md
  * for the text-copy analogue of the same "iterate on proven references" principle.
  *
- * API contract (confirmed against docs.kie.ai, not just the course's example payloads):
+ * Originally built against Kie.ai's Sora-2-pro-storyboard model, which turned out to
+ * be paused platform-wide (Kie.ai returned "This interface is temporarily paused" on
+ * every Sora 2 variant, confirmed with a live account that had valid credits) — this
+ * lines up with OpenAI's official Sora API sunset (Sept 24, 2026). Switched to
+ * Bytedance Seedance 2.0 instead: no known sunset, cheaper per second, and its
+ * `reference_image_urls`/`reference_audio_urls` fields are a *better* consistency
+ * mechanism than Sora's free-text-description-or-character-tag approach — upload a
+ * real photo/voice sample and it's used directly, rather than described in prose.
+ *
+ * API contract (confirmed empirically against the live API with a real account, and
+ * against the model's own parameter schema embedded in kie.ai/seedance-2-0's page
+ * data — docs.kie.ai's per-model pages return 404/403 to non-browser fetches):
  *   POST https://api.kie.ai/api/v1/jobs/createTask
  *     Authorization: Bearer <KIE_AI_API_KEY>, body { model, input }
+ *     input: { prompt, duration (4-15s), aspect_ratio, resolution, generate_audio,
+ *              reference_image_urls? }
  *     -> { code, msg, data: { taskId } }
  *   GET  https://api.kie.ai/api/v1/jobs/recordInfo?taskId=...
  *     -> { data: { state: "waiting"|"queuing"|"generating"|"success"|"fail",
@@ -21,64 +34,58 @@
 import { randomUUID } from "crypto";
 
 import { settings } from "../core/config";
-import { CharacterInput, VideoGenerationRequestInput, VideoSceneInput } from "../schemas/videoGeneration";
+import { CharacterInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
 import { uploadFile } from "./storage";
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
-const MODEL = "sora-2-pro-storyboard";
+const MODEL = "bytedance/seedance-2";
+const MIN_DURATION = 4;
+const MAX_DURATION = 15;
 
 // Matches the "UGC Authenticity Keywords" / "Universal Quality Control Negatives"
 // blocks present verbatim in every worked example in the course material — these
-// are what keep Sora's output from reading as AI-generated (the "7 things that
-// scream AI": dead eyes, floating products, too-perfect lighting, robot hands, etc).
+// are what keep the output from reading as AI-generated (the "7 things that scream
+// AI": dead eyes, floating products, too-perfect lighting, robot hands, etc).
 const UGC_AUTHENTICITY_KEYWORDS =
   "smartphone selfie, handheld realism, influencer-style monologue, direct-to-camera, authentic recommendation, conversational delivery, raw unfiltered TikTok aesthetic, real voice, authentic performance, micro hand jitters, single continuous take, unedited";
 
 const QUALITY_CONTROL_NEGATIVES =
-  "subtitles, captions, watermark, text overlays, words on screen, logo, branding, poor lighting, blurry footage, low resolution, artifacts, unwanted objects, inconsistent character appearance, audio sync issues, amateur quality, cartoon effects, unrealistic proportions, distorted hands, artificial lighting, oversaturation, compression noise, camera shake";
+  "subtitles, captions, watermark, text overlays, words on screen, logo, branding, poor lighting, blurry footage, low resolution, artifacts, unwanted objects, inconsistent character appearance, amateur quality, cartoon effects, unrealistic proportions, distorted hands, artificial lighting, oversaturation, compression noise, camera shake";
 
 /** Preserves the real product's label/packaging exactly rather than letting the
  * model reinterpret it — the single most repeated instruction across the course's
  * product-reference prompts ("pixel-perfect to img1... no redesign, recolor, or
- * artistic reinterpretation"), aimed at Sora's tendency to redraw uploaded labels. */
+ * artistic reinterpretation"). Seedance also takes the actual image via
+ * reference_image_urls, but the text reinforces intent for what it should render. */
 const PRODUCT_FIDELITY_CLAUSE =
-  "All product typography, proportions, and artwork must remain pixel-perfect to the uploaded reference image with no redesign, recolor, or artistic reinterpretation.";
+  "All product typography, proportions, and artwork must remain pixel-perfect to the reference image with no redesign, recolor, or artistic reinterpretation.";
 
 function buildCharacterClause(character?: CharacterInput): string {
   if (!character) return "Character: an authentic, relatable person filmed in natural UGC style";
-  if (character.tag) return `Character: ${character.tag}`;
-
   const bits = [character.age, character.ethnicity, character.gender].filter(Boolean).join(" ");
   const base = character.name ? `${character.name}, a ${bits}`.trim() : `a ${bits}`.trim();
   return `Character: ${base}${character.description ? ` with ${character.description}` : ""}`.trim();
 }
 
-function buildSceneText(
-  request: VideoGenerationRequestInput,
-  scene: VideoSceneInput,
-  index: number,
-  characterClause: string
-): string {
+/** Seedance takes one prompt per call (no multi-shot/storyboard API) — scenes are
+ * concatenated into a single continuous take, each introduced as its own beat rather
+ * than described as physically separate shots. */
+export function buildVideoPrompt(request: VideoGenerationRequestInput): string {
+  if (request.customPrompt) return request.customPrompt;
+
   const hasProductRef = request.productShots.length > 0;
-
-  if (index > 0) {
-    // Continuation shots reuse the established character/setting rather than
-    // re-describing them — matches every multi-scene example in the source
-    // material, which keeps Sora's storyboard shots visually consistent without
-    // ballooning prompt length per shot.
-    return `The exact same scene and character from before:\n${scene.action}`;
-  }
-
   const location = request.location || "a cozy, well-lit home setting";
   const filename = `IMG_${Math.floor(1000 + Math.random() * 9000)}.MOV`;
+  const characterClause = buildCharacterClause(request.character);
+  const actions = request.scenes.map((s) => s.action).join("\n");
 
   const parts = [
     `A casual, selfie-style IPHONE 15 PRO front-camera vertical video (9:16) filmed in ${location}, titled "${filename}".`,
     characterClause,
     hasProductRef ? PRODUCT_FIDELITY_CLAUSE : "",
-    "Cinematography: Camera Shot: Medium close-up, slightly high angle, mostly stable framing with a slight gentle drift. Lens & DOF: IPHONE 15 PRO front camera (~24mm), no depth of field. Camera Motion: Subtle, natural handheld sway. Lighting: Bright, soft natural light. Color & Grade: IPHONE 15 PRO HDR auto-tone; neutral warm daylight palette with accurate, natural skin texture; no filters applied. Resolution & Aspect Ratio: 1080x1920, 30 fps, vertical.",
-    `Actions:\n${scene.action}`,
-    "Audio & Ambience: Recorded through the phone's built-in mic — crisp, clear voice with natural room tone. No music, no cuts; one continuous take.",
+    "Cinematography: Camera Shot: Medium close-up, slightly high angle, mostly stable framing with a slight gentle drift. Lens & DOF: IPHONE 15 PRO front camera (~24mm), no depth of field. Camera Motion: Subtle, natural handheld sway. Lighting: Bright, soft natural light. Color & Grade: neutral warm daylight palette with accurate, natural skin texture; no filters applied.",
+    `Actions:\n${actions}`,
+    "Audio & Ambience: Crisp, clear voice with natural room tone. No music, no cuts; one continuous take.",
     `UGC Authenticity Keywords: ${UGC_AUTHENTICITY_KEYWORDS}.`,
     `Universal Quality Control Negatives: ${QUALITY_CONTROL_NEGATIVES}.`,
   ];
@@ -86,12 +93,12 @@ function buildSceneText(
   return parts.filter(Boolean).join("\n\n");
 }
 
-export function buildVideoShots(request: VideoGenerationRequestInput): { duration: number; Scene: string }[] {
-  const characterClause = buildCharacterClause(request.character);
-  return request.scenes.map((scene, index) => ({
-    duration: scene.durationSeconds,
-    Scene: buildSceneText(request, scene, index, characterClause),
-  }));
+function buildAspectRatio(aspectRatio: VideoGenerationRequestInput["aspectRatio"]): string {
+  return aspectRatio === "landscape" ? "16:9" : "9:16";
+}
+
+function clampDuration(totalSeconds: number): number {
+  return Math.min(MAX_DURATION, Math.max(MIN_DURATION, totalSeconds));
 }
 
 interface CreateTaskResponse {
@@ -105,19 +112,17 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
     throw new Error("KIE_AI_API_KEY not configured");
   }
 
-  const shots = request.customPrompt
-    ? [{ duration: request.scenes[0]?.durationSeconds ?? 15, Scene: request.customPrompt }]
-    : buildVideoShots(request);
-  const totalDuration = shots.reduce((sum, s) => sum + s.duration, 0);
+  const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
 
   const input: Record<string, unknown> = {
-    aspect_ratio: request.aspectRatio,
-    n_frames: String(totalDuration),
-    remove_watermark: request.removeWatermark,
-    shots,
+    prompt: buildVideoPrompt(request),
+    duration: clampDuration(totalDuration),
+    aspect_ratio: buildAspectRatio(request.aspectRatio),
+    resolution: request.resolution,
+    generate_audio: true,
   };
   if (request.productShots.length > 0) {
-    input.image_urls = request.productShots;
+    input.reference_image_urls = request.productShots;
   }
 
   const response = await fetch(`${KIE_BASE_URL}/createTask`, {
