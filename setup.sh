@@ -147,19 +147,6 @@ else
     MISSING_DEPS+=("npm (comes with Node.js)")
 fi
 
-# Check Python
-print_step "Checking Python..."
-if check_command python3; then
-    PYTHON_VERSION=$(python3 --version)
-    print_success "$PYTHON_VERSION"
-elif check_command python; then
-    PYTHON_VERSION=$(python --version)
-    print_success "$PYTHON_VERSION"
-else
-    print_error "Python not found"
-    MISSING_DEPS+=("Python 3.11+ (https://python.org)")
-fi
-
 # Check PostgreSQL
 print_step "Checking PostgreSQL..."
 if check_command psql; then
@@ -227,7 +214,7 @@ if [ "$SKIP_ENV" != "true" ]; then
 
     echo ""
     echo -e "${BOLD}Authentication${NC}"
-    SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
+    SECRET_KEY=$(openssl rand -base64 32)
     print_info "Generated random SECRET_KEY"
 
     echo ""
@@ -273,7 +260,7 @@ if [ "$SKIP_ENV" != "true" ]; then
         R2_SECRET_ACCESS_KEY=""
         R2_BUCKET_NAME=""
         R2_PUBLIC_URL=""
-        print_info "Files will be stored locally in backend/uploads/"
+        print_info "Files will be stored locally in backend-node/uploads/"
     fi
 
     echo ""
@@ -337,20 +324,10 @@ fi
 print_header "Step 3: Installing Dependencies"
 
 # Backend
-print_step "Setting up Python virtual environment..."
-cd backend
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    print_success "Created virtual environment"
-else
-    print_info "Virtual environment already exists"
-fi
-
-print_step "Installing Python dependencies..."
-source venv/bin/activate
-pip install -q -r requirements.txt
-print_success "Installed Python dependencies"
-
+print_step "Installing backend dependencies..."
+cd backend-node
+npm install --silent
+print_success "Installed backend dependencies"
 cd ..
 
 # Frontend
@@ -367,25 +344,24 @@ print_header "Step 4: Database Initialization"
 
 if confirm "Do you want to initialize the database now?" "y"; then
     print_step "Initializing database..."
-    cd backend
-    source venv/bin/activate
+    cd backend-node
 
     # Source the env file
     set -a
     source ../.env.local
     set +a
 
-    if python init_db.py; then
+    if npx prisma migrate deploy && npx tsx prisma/seed.ts; then
         print_success "Database initialized successfully!"
     else
         print_error "Database initialization failed"
         print_info "Check your DATABASE_URL and try again"
-        print_info "You can run manually: cd backend && python init_db.py"
+        print_info "You can run manually: cd backend-node && npx prisma migrate deploy && npx tsx prisma/seed.ts"
     fi
     cd ..
 else
     print_info "Skipping database initialization"
-    print_info "Run later: cd backend && source venv/bin/activate && python init_db.py"
+    print_info "Run later: cd backend-node && npx prisma migrate deploy && npx tsx prisma/seed.ts"
 fi
 
 #
@@ -396,9 +372,8 @@ print_header "Setup Complete! 🎉"
 echo -e "${BOLD}To start the application:${NC}"
 echo ""
 echo "  ${CYAN}Terminal 1 (Backend):${NC}"
-echo "    cd backend"
-echo "    source venv/bin/activate"
-echo "    uvicorn app.main:app --reload --port 8000"
+echo "    cd backend-node"
+echo "    npm run dev"
 echo ""
 echo "  ${CYAN}Terminal 2 (Frontend):${NC}"
 echo "    cd frontend"
@@ -406,7 +381,7 @@ echo "    npm run dev"
 echo ""
 echo -e "${BOLD}Then open:${NC}"
 echo "    Frontend:  http://localhost:5173"
-echo "    API Docs:  http://localhost:8000/api/v1/docs"
+echo "    Backend:   http://localhost:8000"
 echo ""
 echo -e "${BOLD}Login with:${NC}"
 echo "    Email:    $ADMIN_EMAIL"

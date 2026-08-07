@@ -3,22 +3,6 @@
 [build]
 builder = "NIXPACKS"
 
-# Backend Service
-[[services]]
-name = "backend"
-source = "backend"
-
-[services.build]
-builder = "DOCKERFILE"
-dockerfilePath = "backend/Dockerfile"
-
-[services.deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/health"
-healthcheckTimeout = 100
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
-
 # Frontend Service
 [[services]]
 name = "frontend"
@@ -30,8 +14,10 @@ builder = "NIXPACKS"
 [services.deploy]
 startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
 
-# Backend Service (Node.js/TypeScript rewrite — see backend-node/, deployed alongside
-# the Python "backend" service above until the rewrite is fully verified and cut over)
+# Backend Service (Node.js/TypeScript — the Python "backend" service and backend/
+# directory have been removed; this is now the only backend). Service is still named
+# "backend-node" in Railway — rename the live service via the dashboard if desired,
+# since editing this file alone does not rename an existing Railway service.
 [[services]]
 name = "backend-node"
 source = "backend-node"
@@ -41,9 +27,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "backend-node/Dockerfile"
 
 [services.deploy]
-# Matches the Dockerfile's CMD exactly (unlike the Python "backend" service above,
-# where railway.toml's startCommand and the Dockerfile CMD disagree on whether
-# migrations run — flagged during the rewrite as a real ambiguity, not reproduced here).
 startCommand = "npx prisma migrate deploy && node dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 100

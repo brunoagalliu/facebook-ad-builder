@@ -17,7 +17,7 @@ Facebook Ad Automation App - A full-stack application for automating the lifecyc
 
 **Tech Stack:**
 - Frontend: React 19 + Vite + TailwindCSS
-- Backend: Python FastAPI (Python 3.11+)
+- Backend: Node.js + TypeScript (Express, Prisma)
 - Database: PostgreSQL on Railway
 - Storage: Cloudflare R2 (S3-compatible)
 - Testing: agent-browser (e2e), Vitest (unit)
@@ -28,24 +28,29 @@ Facebook Ad Automation App - A full-stack application for automating the lifecyc
 ### Backend
 
 ```bash
-cd backend
-
-# Setup virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+cd backend-node
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
-# Initialize database (PostgreSQL required)
-python init_db.py
+# Apply migrations + seed roles/permissions (and bootstrap superuser if
+# ADMIN_EMAIL/ADMIN_PASSWORD are set)
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
 
-# Run development server
-uvicorn app.main:app --reload --port 8000
+# Run development server (tsx watch)
+npm run dev  # Runs on http://localhost:8000
+
+# Build + run production build
+npm run build
+npm start
+
+# Lint / format
+npm run lint
+npm run format
 
 # Run tests
-pytest
-pytest test_research.py  # Run single test file
+npm test
 ```
 
 ### Frontend
@@ -71,24 +76,24 @@ npm run preview
 
 ### Full Stack Development
 
-The backend API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`. API documentation is available at `http://localhost:8000/api/v1/docs`.
+The backend API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`.
 
 ## Architecture
 
-### Database Models (backend/app/models.py)
+### Database Models (backend-node/prisma/schema.prisma)
 
 Core entities and their relationships:
 
 - **Brand**: Central entity with logo, colors (primary/secondary/highlight), voice
   - Has many Products (cascade delete)
-  - Has many CustomerProfiles (many-to-many via brand_profiles table)
+  - Has many CustomerProfiles (many-to-many via a join table)
   - Has many GeneratedAds
 
 - **Product**: Belongs to Brand, contains description, product_shots (JSON), default_url
 
 - **CustomerProfile**: Demographics, pain_points, goals - linked to Brands
 
-- **WinningAds**: Template library with structural analysis, blueprint_json for Ad Remix Engine
+- **WinningAd**: Template library with structural analysis, blueprint_json for Ad Remix Engine
 
 - **GeneratedAd**: Output from AI generation, links Brand + Product + Template, includes ad_bundle_id for grouping
 
@@ -96,41 +101,56 @@ Core entities and their relationships:
 
 - **ScrapedAd**: Competitor ads from research module
 
-### Backend Structure (FastAPI)
+- **User/Role/Permission/RefreshToken**: JWT auth with role-based access control
+
+### Backend Structure (Express + Prisma)
 
 ```
-backend/app/
-├── main.py              # FastAPI app, CORS, router registration
-├── database.py          # SQLAlchemy engine, SessionLocal, Base
-├── models.py            # All SQLAlchemy models
+backend-node/src/
+├── index.ts              # Entry point: DB connectivity check, listen, cron start
+├── app.ts                # Express app wiring: CORS, security headers, router registration
 ├── core/
-│   └── config.py        # Settings, validates DATABASE_URL is PostgreSQL
-├── api/v1/              # API endpoints (all prefixed /api/v1)
-│   ├── brands.py
-│   ├── products.py
-│   ├── profiles.py      # Customer profiles
-│   ├── generated_ads.py # AI-generated ads
-│   ├── facebook.py      # Campaign/AdSet/Ad management
-│   ├── research.py      # Competitor scraping
-│   ├── ad_remix.py      # Blueprint deconstruction/reconstruction
-│   ├── copy_generation.py
-│   ├── templates.py
-│   ├── uploads.py
-│   └── dashboard.py
-├── services/            # Business logic
-│   ├── facebook_service.py    # Facebook Marketing API (facebook-business SDK)
-│   ├── research_service.py
-│   ├── scraper.py
-│   └── ad_remix_service.py    # Uses Gemini Vision for template analysis
-└── schemas/             # Pydantic models (if exists)
+│   ├── config.ts          # Settings, validates DATABASE_URL is PostgreSQL
+│   ├── prisma.ts          # Prisma client (driver adapter)
+│   ├── security.ts        # Password hashing, JWT access/refresh tokens
+│   ├── rateLimit.ts
+│   └── cron.ts             # Scheduled search cron
+├── middleware/
+│   ├── auth.ts             # requireAuth/requireRole/requirePermission/requireSuperuser
+│   ├── validate.ts         # Zod request-body validation
+│   └── asyncHandler.ts
+├── routes/                # API endpoints (all mounted under /api/v1)
+│   ├── auth.ts
+│   ├── users.ts            # User/role/permission management (superuser only)
+│   ├── brands.ts
+│   ├── products.ts
+│   ├── profiles.ts         # Customer profiles
+│   ├── generatedAds.ts     # AI-generated ads
+│   ├── facebook.ts         # Campaign/AdSet/Ad management
+│   ├── research.ts         # Competitor scraping
+│   ├── adRemix.ts          # Blueprint deconstruction/reconstruction
+│   ├── copyGeneration.ts
+│   ├── templates.ts
+│   ├── uploads.ts
+│   └── dashboard.ts
+├── services/               # Business logic
+│   ├── facebookService.ts   # Facebook Marketing API (facebook-nodejs-business-sdk)
+│   ├── researchService.ts
+│   ├── scraperService.ts
+│   └── adRemixService.ts    # Uses Gemini Vision for template analysis
+├── schemas/                 # Zod request/response schemas
+└── prisma/
+    ├── schema.prisma
+    ├── migrations/
+    └── seed.ts               # Seeds roles/permissions + optional bootstrap superuser
 ```
 
 **Key Backend Patterns:**
 - All routes use `/api/v1` prefix
-- Database dependency injection via `Depends(get_db)`
-- PostgreSQL required - config.py validates DATABASE_URL on startup
-- Facebook API uses `facebook-business` SDK (AdAccount, Campaign, AdSet, Ad, AdCreative, AdImage)
-- AI services use Google Gemini (GEMINI_API_KEY) and Fal.ai (FAL_AI_API_KEY)
+- Auth via Express middleware (`requireAuth`, `requirePermission(...)`, `requireSuperuser`), not per-route DI
+- PostgreSQL required - core/config.ts validates DATABASE_URL on startup
+- Facebook API uses `facebook-nodejs-business-sdk` (AdAccount, Campaign, AdSet, Ad, AdCreative, AdImage)
+- AI services use Google Gemini (GEMINI_API_KEY), Anthropic (ANTHROPIC_API_KEY) and Fal.ai (FAL_AI_API_KEY)
 - File uploads go to Cloudflare R2 when configured, falls back to local `uploads/` for dev
 
 ### Frontend Structure (React + Vite)
@@ -253,7 +273,7 @@ VITE_FACEBOOK_ACCESS_TOKEN=...
 VITE_FACEBOOK_API_VERSION=v24.0
 
 # Auth
-SECRET_KEY=...  # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=...  # Generate with: openssl rand -base64 32
 ```
 
 **Railway Environment Variables** (set in dashboard):
@@ -272,12 +292,10 @@ SECRET_KEY=...  # Generate with: python -c "import secrets; print(secrets.token_
 
 ## Code Style & Standards
 
-### Backend (Python)
-- **Style Guide**: PEP 8
-- **Formatter**: Black (line length 88)
-- **Linter**: Flake8 or Ruff
-- **Imports**: Sort with isort
-- **Naming**: `snake_case` for functions/variables, `PascalCase` for classes
+### Backend (TypeScript/Node)
+- **Formatter**: Prettier
+- **Linter**: ESLint
+- **Naming**: `camelCase` for functions/variables, `PascalCase` for classes/types
 
 ### Frontend (JavaScript/React)
 - **Formatter**: Prettier
@@ -317,7 +335,7 @@ SECRET_KEY=...  # Generate with: python -c "import secrets; print(secrets.token_
 
 **Post-Deploy Verification:**
 ```bash
-railway logs --tail 30  # Look for "Uvicorn running on http://0.0.0.0:8080"
+railway logs --tail 30  # Look for "Facebook Ad Automation API listening on port 8080"
 ```
 
 **MANDATORY - Feature Testing After Deployment:**
@@ -335,8 +353,8 @@ TEST_EMAIL=user@example.com TEST_PASSWORD=xxx npm run test:auth
 
 2. **Unit Tests** (backend):
 ```bash
-cd backend
-pytest tests/test_<feature>.py -v
+cd backend-node
+npm test
 ```
 
 3. **Unit Tests** (frontend):
@@ -348,7 +366,7 @@ npm run test:unit
 **Test file locations:**
 - Frontend e2e: `frontend/tests/agent-browser/*.sh`
 - Frontend unit: `frontend/src/**/*.test.js`
-- Backend unit: `backend/tests/test_*.py`
+- Backend unit: `backend-node/src/**/*.test.ts` (Jest; no suite exists yet — `npm test` passes with none)
 
 **agent-browser Quick Reference:**
 ```bash
@@ -367,9 +385,9 @@ agent-browser close               # Close browser
 
 ## Common Gotchas
 
-- Database migrations run automatically on deploy via Dockerfile CMD
-- Always commit ALL new migration files and their dependencies before pushing
+- Database migrations run automatically on deploy via the Dockerfile CMD (`npx prisma migrate deploy`)
+- Always commit ALL new Prisma migration files and their dependencies before pushing
 - Frontend API URL set via `VITE_API_URL` env var (build-time, not runtime)
-- When adding new origins: update CORS in `main.py` AND CSP in `index.html`
-- Ad account IDs auto-prefixed with 'act_' if missing (facebook_service.py)
-- Local dev uses same Railway DB + R2 as production (shared data)
+- When adding new origins: update CORS in `backend-node/src/app.ts` AND CSP in `index.html`
+- Ad account IDs auto-prefixed with 'act_' if missing (facebookService.ts)
+- Local dev uses same Railway DB + R2 as production (shared data) — note `backend-node/.env` currently points at a separate local staging Postgres DB for that service's own dev workflow; check which `DATABASE_URL` is active before assuming shared-data behavior

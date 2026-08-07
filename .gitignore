@@ -35,23 +35,14 @@ dist-ssr
 *.db-shm
 *.db-wal
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.venv/
-*.egg-info/
-
 # Test artifacts
 test-results/
 playwright-report/
-.pytest_cache/
 
 # Uploads (user generated)
-backend/uploads/*.png
-backend/uploads/*.jpg
-backend/uploads/*.webp
+backend-node/uploads/*.png
+backend-node/uploads/*.jpg
+backend-node/uploads/*.webp
 
 # Backups
 *.sql

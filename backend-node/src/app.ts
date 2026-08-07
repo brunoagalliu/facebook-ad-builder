@@ -19,6 +19,7 @@ import promptsRouter from "./routes/prompts";
 import researchRouter from "./routes/research";
 import templatesRouter from "./routes/templates";
 import uploadsRouter from "./routes/uploads";
+import usersRouter from "./routes/users";
 
 // Ports main.py's FastAPI app wiring: CORS, security headers, trust-proxy, static /uploads,
 // and the plain "/" and "/health" routes. Feature routers (auth, brands, research, facebook,
@@ -79,6 +80,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/ad-remix", adRemixRouter);
   app.use("/api/v1/research", researchRouter);
   app.use("/api/v1/facebook", facebookRouter);
+  app.use("/api/v1/users", usersRouter);
 
   // All routes from backend/app/main.py are now ported.
 
