@@ -22,7 +22,7 @@ import {
   searchAdsWithoutSaving,
 } from "../services/researchService";
 import { runScheduledSearches } from "../services/schedulerService";
-import { promoteTopAdsForVertical } from "../services/winnerPromotionService";
+import { promoteScrapedAd, promoteTopAdsForVertical } from "../services/winnerPromotionService";
 
 const router = Router();
 
@@ -310,6 +310,25 @@ router.post(
       res.json(result);
     } catch (err) {
       res.status(500).json({ detail: `Promotion failed: ${(err as Error).message}` });
+    }
+  })
+);
+
+// Manual "mark as winner" — lets a user promote a specific scraped ad they've judged
+// to be a winner, regardless of what the run-duration heuristic says. Same underlying
+// pipeline as the automatic route above, just targeting one ad instead of the top-N
+// per vertical.
+router.post(
+  "/scraped-ads/:scrapedAdId/promote",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    try {
+      const promoted = await promoteScrapedAd(req.params.scrapedAdId, "manual");
+      res.json(promoted);
+    } catch (err) {
+      const message = (err as Error).message;
+      const status = message.includes("not found") ? 404 : message.includes("already been promoted") ? 400 : 502;
+      res.status(status).json({ detail: message });
     }
   })
 );

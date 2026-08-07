@@ -1,7 +1,10 @@
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { searchAndSave, getSavedSearches, deleteSavedSearch, getApiUsage, getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist, getRateLimit, getVerticals, createVertical, getVerticalAggregatedAds, getVerticalPageAds } from '../api/research';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const COUNTRIES = [
     { code: 'US', name: 'United States' },
@@ -30,7 +33,10 @@ const LIMIT_OPTIONS = [
 
 const Research = () => {
     const { showSuccess, showError, showInfo } = useToast();
+    const { authFetch } = useAuth();
     const location = useLocation();
+    const [promotingAdId, setPromotingAdId] = useState(null);
+    const [promotedAdIds, setPromotedAdIds] = useState(new Set());
     const [query, setQuery] = useState('');
     const [source, setSource] = useState('facebook');
     const [country, setCountry] = useState('US');
@@ -145,6 +151,23 @@ const Research = () => {
                     setPageAds(prev => ({ ...prev, [pageId]: [] }));
                 }
             }
+        }
+    };
+
+    const handlePromoteAd = async (ad) => {
+        setPromotingAdId(ad.id);
+        try {
+            const response = await authFetch(`${API_URL}/research/scraped-ads/${ad.id}/promote`, { method: 'POST' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to mark ad as winner');
+            }
+            setPromotedAdIds(prev => new Set(prev).add(ad.id));
+            showSuccess(`Marked as winner — analyzing its structure now. Check Winning Ads shortly.`);
+        } catch (error) {
+            showError(error.message || 'Failed to mark ad as winner');
+        } finally {
+            setPromotingAdId(null);
         }
     };
 
@@ -655,15 +678,36 @@ const Research = () => {
                                                                             }`}>
                                                                                 Seen {ad.seen_count || 1}x
                                                                             </span>
+                                                                            {ad.run_duration_days != null && (
+                                                                                <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded font-medium" title="Days this ad has been running — the strongest signal available that it's still working">
+                                                                                    Running {ad.run_duration_days}d
+                                                                                </span>
+                                                                            )}
                                                                         </div>
-                                                                        <a
-                                                                            href={ad.ad_link}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="text-indigo-600 hover:text-indigo-800"
-                                                                        >
-                                                                            View Ad →
-                                                                        </a>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <a
+                                                                                href={ad.ad_link}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-indigo-600 hover:text-indigo-800"
+                                                                            >
+                                                                                View Ad →
+                                                                            </a>
+                                                                            {promotedAdIds.has(ad.id) ? (
+                                                                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-medium">
+                                                                                    ✓ Marked as Winner
+                                                                                </span>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={() => handlePromoteAd(ad)}
+                                                                                    disabled={promotingAdId === ad.id}
+                                                                                    className="px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    title="Analyzes this ad's structure with AI and adds it to your Winning Ads blueprint library"
+                                                                                >
+                                                                                    {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             ))
@@ -1046,14 +1090,28 @@ const Research = () => {
                                                                     {ad.start_date ? new Date(ad.start_date).toLocaleDateString() : '-'}
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm whitespace-nowrap">
-                                                                    <a
-                                                                        href={ad.ad_link}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-indigo-600 hover:text-indigo-900"
-                                                                    >
-                                                                        View
-                                                                    </a>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <a
+                                                                            href={ad.ad_link}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="text-indigo-600 hover:text-indigo-900"
+                                                                        >
+                                                                            View
+                                                                        </a>
+                                                                        {promotedAdIds.has(ad.id) ? (
+                                                                            <span className="text-green-700 font-medium">✓ Winner</span>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => handlePromoteAd(ad)}
+                                                                                disabled={promotingAdId === ad.id}
+                                                                                className="text-amber-700 hover:text-amber-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                title="Analyzes this ad's structure with AI and adds it to your Winning Ads blueprint library"
+                                                                            >
+                                                                                {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}

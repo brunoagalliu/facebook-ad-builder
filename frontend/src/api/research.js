@@ -181,6 +181,14 @@ export const getVerticalPageAds = async (verticalId, pageId) => {
     }
 };
 
+// NOTE: promoteScrapedAd (POST /scraped-ads/:id/promote) is NOT exported from here —
+// unlike every other function in this file, that endpoint requires auth
+// (requirePermission("templates:write")), and this module's plain axios calls carry
+// no Authorization header (no global axios interceptor exists in this app). It's
+// called directly from Research.jsx using useAuth()'s authFetch instead, matching how
+// every other authenticated write action in this app is done (BrandForm.jsx,
+// ImageAds.jsx, VideoAds.jsx) — see the "Mark as Winner" button there.
+
 // Brand Scrapes API
 export const createBrandScrape = async (brandName, pageUrl) => {
     try {
