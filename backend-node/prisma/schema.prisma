@@ -348,24 +348,40 @@ model SearchLog {
 }
 
 model ScrapedAd {
-  id             String   @id @default(uuid())
-  brandName      String?  @map("brand_name")
-  headline       String?
-  adCopy         String?  @map("ad_copy")
-  ctaText        String?  @map("cta_text")
-  platform       String   @default("facebook")
-  externalId     String?  @unique @map("external_id")
-  contentHash    String?  @unique @map("content_hash")
-  adLink         String   @map("ad_link")
-  platforms      Json?
-  startDate      String?  @map("start_date")
-  mediaType      String?  @map("media_type")
-  firstSeen      DateTime @default(now()) @map("first_seen")
-  lastSeen       DateTime @default(now()) @updatedAt @map("last_seen")
-  seenCount      Int      @default(1) @map("seen_count")
-  searchId       String?  @map("search_id")
-  facebookPageId String?  @map("facebook_page_id")
-  createdAt      DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  brandName        String?  @map("brand_name")
+  headline         String?
+  adCopy           String?  @map("ad_copy")
+  ctaText          String?  @map("cta_text")
+  platform         String   @default("facebook")
+  externalId       String?  @unique @map("external_id")
+  contentHash      String?  @unique @map("content_hash")
+  adLink           String   @map("ad_link")
+  platforms        Json?
+  startDate        String?  @map("start_date")
+  // Meta's ad_delivery_stop_time — present only once an ad has actually stopped
+  // running; null means "still active" as of the last time we saw it. Together with
+  // startDate this is the run-duration "winner" signal: Meta only populates
+  // impressions/spend (below) for political/issue ads, so for ordinary commercial ads
+  // how long an ad has kept running is the best proxy this API exposes for "this is
+  // working" — nobody pays to keep a losing ad live for weeks.
+  stopDate         String?  @map("stop_date")
+  // Meta returns these as {lower_bound, upper_bound} ranges, not single numbers, and
+  // only for political/issue ads — null for the vast majority of commercial ads this
+  // app scrapes. Captured when present rather than silently discarded (as it was
+  // before), not the primary winner signal.
+  impressionsLower Int?     @map("impressions_lower")
+  impressionsUpper Int?     @map("impressions_upper")
+  spendLower       Int?     @map("spend_lower")
+  spendUpper       Int?     @map("spend_upper")
+  currency         String?
+  mediaType        String?  @map("media_type")
+  firstSeen        DateTime @default(now()) @map("first_seen")
+  lastSeen         DateTime @default(now()) @updatedAt @map("last_seen")
+  seenCount        Int      @default(1) @map("seen_count")
+  searchId         String?  @map("search_id")
+  facebookPageId   String?  @map("facebook_page_id")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   savedSearch  SavedSearch?  @relation(fields: [searchId], references: [id], onDelete: Cascade)
   facebookPage FacebookPage? @relation(fields: [facebookPageId], references: [id], onDelete: SetNull)

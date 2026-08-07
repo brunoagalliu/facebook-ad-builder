@@ -12,7 +12,14 @@ import {
   scrapeBrand,
 } from "../services/brandScraperService";
 import { checkLimit, getUsageStats } from "../services/rateLimiter";
-import { deleteSavedSearch, getSavedSearchWithAds, getSavedSearches, searchAndSave, searchAdsWithoutSaving } from "../services/researchService";
+import {
+  computeRunDurationDays,
+  deleteSavedSearch,
+  getSavedSearchWithAds,
+  getSavedSearches,
+  searchAndSave,
+  searchAdsWithoutSaving,
+} from "../services/researchService";
 import { runScheduledSearches } from "../services/schedulerService";
 
 const router = Router();
@@ -367,22 +374,36 @@ router.get(
         if (!existing || ad.id < existing.id) seen.set(key, ad);
       }
 
-      res.json(
-        Array.from(seen.values()).map((ad) => ({
-          id: ad.id,
-          brand_name: ad.brandName,
-          headline: ad.headline,
-          ad_copy: ad.adCopy,
-          cta_text: ad.ctaText,
-          media_type: ad.mediaType,
-          ad_link: ad.adLink,
-          start_date: ad.startDate,
-          platforms: ad.platforms,
-          seen_count: ad.seenCount ?? 1,
-          first_seen: ad.firstSeen ? ad.firstSeen.toISOString() : null,
-          last_seen: ad.lastSeen ? ad.lastSeen.toISOString() : null,
-        }))
-      );
+      let result = Array.from(seen.values()).map((ad) => ({
+        id: ad.id,
+        brand_name: ad.brandName,
+        headline: ad.headline,
+        ad_copy: ad.adCopy,
+        cta_text: ad.ctaText,
+        media_type: ad.mediaType,
+        ad_link: ad.adLink,
+        start_date: ad.startDate,
+        stop_date: ad.stopDate,
+        platforms: ad.platforms,
+        seen_count: ad.seenCount ?? 1,
+        first_seen: ad.firstSeen ? ad.firstSeen.toISOString() : null,
+        last_seen: ad.lastSeen ? ad.lastSeen.toISOString() : null,
+        run_duration_days: computeRunDurationDays(ad.startDate, ad.stopDate),
+        impressions_lower: ad.impressionsLower,
+        impressions_upper: ad.impressionsUpper,
+        spend_lower: ad.spendLower,
+        spend_upper: ad.spendUpper,
+        currency: ad.currency,
+      }));
+
+      // "Winning" ads first when requested — run duration is the best proxy this API
+      // exposes for ordinary commercial ads (see computeRunDurationDays); nulls (no
+      // parseable start_date) sort last rather than first.
+      if (req.query.sort_by === "run_duration") {
+        result = result.sort((a, b) => (b.run_duration_days ?? -1) - (a.run_duration_days ?? -1));
+      }
+
+      res.json(result);
     } catch (err) {
       console.error("Error in page ads:", err);
       res.status(500).json({ detail: `Error fetching page ads: ${(err as Error).message}` });

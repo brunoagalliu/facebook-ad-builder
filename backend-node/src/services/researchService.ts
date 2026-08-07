@@ -31,6 +31,23 @@ export function computeContentHash(ad: ScrapedAdCreate): string {
   return crypto.createHash("sha256").update(content, "utf-8").digest("hex");
 }
 
+/** How many days an ad has been running — the primary "winner" signal available for
+ * ordinary commercial ads (Meta only exposes real impressions/spend for political/
+ * issue ads). Still-running ads (no stopDate) are measured against now; nobody pays
+ * to keep a losing ad live for weeks, so longer-running is a real proxy for "working."
+ * Returns null when startDate is missing or unparseable rather than guessing. */
+export function computeRunDurationDays(startDate: string | null, stopDate: string | null): number | null {
+  if (!startDate) return null;
+  const start = new Date(startDate);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const end = stopDate ? new Date(stopDate) : new Date();
+  if (Number.isNaN(end.getTime())) return null;
+
+  const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return days >= 0 ? days : null;
+}
+
 export async function searchAdsWithoutSaving(request: AdSearchRequestInput): Promise<ScrapedAdCreate[]> {
   return runSearch(request);
 }
@@ -107,7 +124,13 @@ export async function searchAndSave(request: AdSearchRequestInput) {
           adLink: adData.ad_link,
           platforms: adData.platforms ?? undefined,
           startDate: adData.start_date,
+          stopDate: adData.stop_date,
           mediaType: adData.media_type,
+          impressionsLower: adData.impressions_lower,
+          impressionsUpper: adData.impressions_upper,
+          spendLower: adData.spend_lower,
+          spendUpper: adData.spend_upper,
+          currency: adData.currency,
           contentHash,
           facebookPageId: fbPageId,
           searchId: savedSearch.id,

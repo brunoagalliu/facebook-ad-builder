@@ -19,6 +19,17 @@ const BASE_URL = "https://app.adplexity.io/api/v2";
 const MAX_COUNT_PER_CALL = 100;
 const DATE_RANGE_DAYS = 30; // API's own max window per call
 
+// TODO(winner-signals): AdPlexity's own product surfaces "first seen"/"last seen" and
+// run-duration data in its UI (per adplexity.io's marketing/blog pages), which would
+// likely be a *better* winner signal than Facebook's own API — Meta only populates
+// impressions/spend for political ads (see ScrapedAd's schema comment), but AdPlexity
+// is explicitly a paid ad-spy tool built around surfacing long-running/high-volume
+// ads. However, ADPLEXITY_API_KEY isn't configured anywhere in this repo, and
+// docs.adplexity.io only renders its schema client-side (same issue as docs.kie.ai
+// before it), so the actual field names on this response can't be confirmed without a
+// live key. Don't guess them — verify against a real account the same way the Kie.ai
+// video model contract was (empirically, against a live key), then extend AdplexityAd
+// and mapAd() below with whatever the real fields turn out to be.
 interface AdplexityAd {
   id: number;
   type: number;

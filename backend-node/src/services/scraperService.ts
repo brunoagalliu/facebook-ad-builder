@@ -23,6 +23,28 @@ export interface ScrapedAdCreate {
   platforms?: string[] | null;
   start_date?: string | null;
   media_type?: string | null;
+  // "Winner" signal fields — see the schema comment on ScrapedAd for why stop_date
+  // (run duration) matters more than impressions/spend for ordinary commercial ads.
+  stop_date?: string | null;
+  impressions_lower?: number | null;
+  impressions_upper?: number | null;
+  spend_lower?: number | null;
+  spend_upper?: number | null;
+  currency?: string | null;
+}
+
+/** Meta returns impressions/spend as {lower_bound, upper_bound} range objects (string
+ * numbers), and only populates them at all for political/issue ads — absent/malformed
+ * for the vast majority of ordinary commercial ads this app scrapes. */
+function parseRange(value: unknown): { lower: number | null; upper: number | null } {
+  if (!value || typeof value !== "object") return { lower: null, upper: null };
+  const range = value as { lower_bound?: string; upper_bound?: string };
+  const lower = range.lower_bound !== undefined ? Number(range.lower_bound) : null;
+  const upper = range.upper_bound !== undefined ? Number(range.upper_bound) : null;
+  return {
+    lower: lower !== null && Number.isFinite(lower) ? lower : null,
+    upper: upper !== null && Number.isFinite(upper) ? upper : null,
+  };
 }
 
 const accessToken = settings.FACEBOOK_ADS_LIBRARY_TOKEN || settings.FACEBOOK_ACCESS_TOKEN;
@@ -57,6 +79,9 @@ function parseApiAd(adData: Record<string, unknown>): ScrapedAdCreate | null {
   const publisherPlatforms = adData.publisher_platforms as string[] | undefined;
   const platforms = publisherPlatforms?.map((p) => p.toLowerCase()) ?? null;
 
+  const impressions = parseRange(adData.impressions);
+  const spend = parseRange(adData.spend);
+
   return {
     brand_name: (adData.page_name as string) ?? "Unknown Brand",
     headline: headline ?? null,
@@ -67,7 +92,13 @@ function parseApiAd(adData: Record<string, unknown>): ScrapedAdCreate | null {
     ad_link: fbLibraryUrl,
     platforms,
     start_date: (adData.ad_delivery_start_time as string) ?? null,
+    stop_date: (adData.ad_delivery_stop_time as string) ?? null,
     media_type: "image",
+    impressions_lower: impressions.lower,
+    impressions_upper: impressions.upper,
+    spend_lower: spend.lower,
+    spend_upper: spend.upper,
+    currency: (adData.currency as string) ?? null,
   };
 }
 
