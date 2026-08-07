@@ -6,7 +6,9 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
+import { videoGenerationRequestSchema } from "../schemas/videoGeneration";
 import { generateImages } from "../services/imageGenerationService";
+import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
 
 const router = Router();
 
@@ -22,6 +24,44 @@ router.post(
       // A total generation failure (e.g. Fal.ai account/billing issue) — surface the
       // real cause instead of letting it fall through to the generic 500 handler.
       res.status(502).json({ detail: (err as Error).message || "Image generation failed" });
+    }
+  })
+);
+
+// Starts an async Kie.ai/Sora video generation job. The frontend polls
+// GET /generate-video/:taskId until it gets a terminal state.
+router.post(
+  "/generate-video",
+  requirePermission("ads:write"),
+  validateBody(videoGenerationRequestSchema),
+  asyncHandler(async (req, res) => {
+    try {
+      const taskId = await createVideoTask(req.body);
+      res.json({ task_id: taskId });
+    } catch (err) {
+      res.status(502).json({ detail: (err as Error).message || "Video generation failed to start" });
+    }
+  })
+);
+
+// Poll for job status. On first observing "success", downloads and persists the
+// result before Kie.ai's 24h result-URL expiry — callers must stop polling once a
+// terminal state (success/fail) comes back, since a second poll after success would
+// re-download and duplicate-store the same video.
+router.get(
+  "/generate-video/:taskId",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      const status = await getVideoTaskStatus(req.params.taskId);
+      if (status.state === "success" && status.resultUrl) {
+        const videoUrl = await downloadAndSaveVideo(status.resultUrl);
+        res.json({ state: status.state, video_url: videoUrl });
+        return;
+      }
+      res.json({ state: status.state, progress: status.progress, detail: status.failMsg });
+    } catch (err) {
+      res.status(502).json({ detail: (err as Error).message || "Failed to fetch video status" });
     }
   })
 );

@@ -11,6 +11,22 @@ import { settings } from "../core/config";
 import { ImageGenerationRequestInput } from "../schemas/generatedAd";
 import { uploadToLocal } from "./storage";
 
+// Distilled from a course on AI UGC ad production — see
+// knowledge/direct_response/21_hook_iteration_from_reference.md and
+// videoGenerationService.ts for the same source material applied elsewhere.
+// Preserves the real product's label/packaging exactly rather than letting the model
+// reinterpret it — aimed at a known Fal.ai failure mode (redrawn/distorted labels)
+// when a real product photo is supplied via the nano-banana-pro/edit path.
+const PRODUCT_FIDELITY_CLAUSE =
+  "All product typography, proportions, and artwork must remain pixel-perfect to the uploaded reference image with no redesign, recolor, or artistic reinterpretation";
+
+// Adapted for still images from the "Universal Quality Control Negatives" list that
+// appears in every worked example of the source material — the "7 things that scream
+// AI" (floating products, too-perfect lighting, distorted hands, etc), minus the
+// video-only terms (audio sync, camera shake) that don't apply to a static image.
+const QUALITY_CONTROL_NEGATIVES_CLAUSE =
+  "Avoid: watermark, text overlays, logo artifacts, distorted or unrealistic proportions, distorted hands, floating or unanchored product, artificial oversaturation, cartoon effects, low-resolution artifacts";
+
 export function buildComprehensivePrompt(request: ImageGenerationRequestInput): string {
   if (request.customPrompt) return request.customPrompt;
 
@@ -44,6 +60,11 @@ export function buildComprehensivePrompt(request: ImageGenerationRequestInput): 
 
   parts.push(`Art Direction: ${mood}, ${lighting}, ${composition}, ${designStyle}`);
   parts.push("High quality, photorealistic, 4k, advertising standard");
+
+  if (request.useProductImage && request.productShots.length > 0) {
+    parts.push(PRODUCT_FIDELITY_CLAUSE);
+  }
+  parts.push(QUALITY_CONTROL_NEGATIVES_CLAUSE);
 
   return parts.filter(Boolean).join(". ");
 }

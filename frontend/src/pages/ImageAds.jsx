@@ -1132,6 +1132,15 @@ Style: ${designStyle}`);
         // 5. QUALITY STANDARDS
         sections.push(`**Quality:** High quality, photorealistic, 4k, advertising standard`);
 
+        // 6. PRODUCT FIDELITY (only when a real product photo is supplied) & QUALITY NEGATIVES
+        // Mirrors backend imageGenerationService.js's PRODUCT_FIDELITY_CLAUSE /
+        // QUALITY_CONTROL_NEGATIVES_CLAUSE, distilled from the same AI UGC ad
+        // production course material — see knowledge/direct_response/21_hook_iteration_from_reference.md.
+        if (wizardData.useProductShots) {
+            sections.push(`**Product Fidelity:** All product typography, proportions, and artwork must remain pixel-perfect to the uploaded reference image with no redesign, recolor, or artistic reinterpretation`);
+        }
+        sections.push(`**Avoid:** watermark, text overlays, logo artifacts, distorted or unrealistic proportions, distorted hands, floating or unanchored product, artificial oversaturation, cartoon effects, low-resolution artifacts`);
+
         // Join with double newlines for clear separation
         return sections.join('\n\n');
     };
