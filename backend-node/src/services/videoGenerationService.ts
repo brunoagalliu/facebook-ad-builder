@@ -35,7 +35,13 @@ import { randomUUID } from "crypto";
 
 import { settings } from "../core/config";
 import { CharacterInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
+import { selectBlueprintForBrand } from "./blueprintSelectionService";
 import { uploadFile } from "./storage";
+
+interface VideoBlueprintInsight {
+  narrative_arc?: string;
+  psychological_triggers?: string[];
+}
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
 const MODEL = "bytedance/seedance-2";
@@ -69,8 +75,18 @@ function buildCharacterClause(character?: CharacterInput): string {
 
 /** Seedance takes one prompt per call (no multi-shot/storyboard API) — scenes are
  * concatenated into a single continuous take, each introduced as its own beat rather
- * than described as physically separate shots. */
-export function buildVideoPrompt(request: VideoGenerationRequestInput): string {
+ * than described as physically separate shots.
+ *
+ * blueprintInsight comes from a WinningAd auto-selected for the brand's vertical
+ * (blueprintSelectionService.ts) — its narrative_arc/psychological_triggers are
+ * text-level, so they translate to a video script; its layout_framework/
+ * visual_style_guide (image composition) deliberately don't, since a UGC selfie
+ * video follows a different visual grammar than a static ad image. Full video-native
+ * blueprint extraction is a later stage, not attempted here. */
+export function buildVideoPrompt(
+  request: VideoGenerationRequestInput,
+  blueprintInsight?: VideoBlueprintInsight
+): string {
   if (request.customPrompt) return request.customPrompt;
 
   const hasProductRef = request.productShots.length > 0;
@@ -79,11 +95,19 @@ export function buildVideoPrompt(request: VideoGenerationRequestInput): string {
   const characterClause = buildCharacterClause(request.character);
   const actions = request.scenes.map((s) => s.action).join("\n");
 
+  const inspirationParts = [
+    blueprintInsight?.narrative_arc ? `narrative arc: ${blueprintInsight.narrative_arc}` : "",
+    blueprintInsight?.psychological_triggers?.length
+      ? `emotional triggers to evoke: ${blueprintInsight.psychological_triggers.join(", ")}`
+      : "",
+  ].filter(Boolean);
+
   const parts = [
     `A casual, selfie-style IPHONE 15 PRO front-camera vertical video (9:16) filmed in ${location}, titled "${filename}".`,
     characterClause,
     hasProductRef ? PRODUCT_FIDELITY_CLAUSE : "",
     "Cinematography: Camera Shot: Medium close-up, slightly high angle, mostly stable framing with a slight gentle drift. Lens & DOF: IPHONE 15 PRO front camera (~24mm), no depth of field. Camera Motion: Subtle, natural handheld sway. Lighting: Bright, soft natural light. Color & Grade: neutral warm daylight palette with accurate, natural skin texture; no filters applied.",
+    inspirationParts.length ? `Creative Inspiration (from research on what's winning in this niche): ${inspirationParts.join("; ")}.` : "",
     `Actions:\n${actions}`,
     "Audio & Ambience: Crisp, clear voice with natural room tone. No music, no cuts; one continuous take.",
     `UGC Authenticity Keywords: ${UGC_AUTHENTICITY_KEYWORDS}.`,
@@ -114,8 +138,12 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
 
   const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
 
+  const brandId = (request.brand as Record<string, unknown> | undefined)?.id as string | undefined;
+  const blueprint = brandId ? await selectBlueprintForBrand(brandId) : null;
+  const blueprintInsight = blueprint?.blueprintJson as VideoBlueprintInsight | undefined;
+
   const input: Record<string, unknown> = {
-    prompt: buildVideoPrompt(request),
+    prompt: buildVideoPrompt(request, blueprintInsight),
     duration: clampDuration(totalDuration),
     aspect_ratio: buildAspectRatio(request.aspectRatio),
     resolution: request.resolution,

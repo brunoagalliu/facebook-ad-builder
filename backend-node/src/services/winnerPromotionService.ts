@@ -83,6 +83,7 @@ export async function promoteTopAdsForVertical(
           notes: `Auto-promoted from research: running ${runDurationDays} days as of promotion.`,
           verticalId,
           sourceScrapedAdId: ad.id,
+          sourceRunDurationDays: runDurationDays,
         },
       });
 

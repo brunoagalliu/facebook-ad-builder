@@ -13,7 +13,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // The original WinningAd Pydantic schema returns snake_case field names matching the
 // DB columns directly — Prisma gives us camelCase, so translate back for API parity.
-function serialize(t: WinningAd) {
+// Exported for reuse by generatedAds.ts's /auto-template (blueprintSelectionService.ts)
+// so an auto-selected blueprint round-trips through the exact same shape the frontend
+// already handles for a manually-picked one.
+export function serialize(t: WinningAd) {
   return {
     id: t.id,
     name: t.name,

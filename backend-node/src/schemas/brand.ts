@@ -25,6 +25,9 @@ export const brandCreateSchema = z.object({
   colors: brandColorsSchema,
   products: z.array(nestedProductSchema).optional().default([]),
   profileIds: z.array(z.string()).optional().default([]),
+  // Optional — lets image/video generation auto-pick the best-fitting WinningAd
+  // blueprint for this brand instead of requiring manual template browsing every time.
+  verticalId: z.string().nullish(),
 });
 export type BrandCreateInput = z.infer<typeof brandCreateSchema>;
 

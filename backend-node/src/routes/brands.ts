@@ -36,6 +36,7 @@ function serializeBrand(brand: {
   primaryColor: string;
   secondaryColor: string;
   highlightColor: string;
+  verticalId: string | null;
   createdAt: Date;
   updatedAt: Date;
   products: Parameters<typeof serializeProduct>[0][];
@@ -47,6 +48,7 @@ function serializeBrand(brand: {
     logo: brand.logo,
     voice: brand.voice,
     colors: { primary: brand.primaryColor, secondary: brand.secondaryColor, highlight: brand.highlightColor },
+    verticalId: brand.verticalId,
     created_at: brand.createdAt,
     updated_at: brand.updatedAt,
     products: brand.products.map(serializeProduct),
@@ -84,6 +86,7 @@ router.post(
           primaryColor: brand.colors.primary,
           secondaryColor: brand.colors.secondary,
           highlightColor: brand.colors.highlight,
+          verticalId: brand.verticalId,
         },
       });
 
@@ -137,6 +140,7 @@ router.put(
           primaryColor: brand.colors.primary,
           secondaryColor: brand.colors.secondary,
           highlightColor: brand.colors.highlight,
+          verticalId: brand.verticalId,
         },
       });
 

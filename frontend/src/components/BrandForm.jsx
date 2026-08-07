@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Unlink } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { validateBrandName, validateHexColor, validateProductName, validateProductDescription, validateBrandVoice, validateTextInput } from '../utils/validation';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const BrandForm = ({ onClose, onSave, initialData = null }) => {
     const { customerProfiles, brands } = useBrands();
     const { showError } = useToast();
+    const { authFetch } = useAuth();
+    const [verticals, setVerticals] = useState([]);
+
+    useEffect(() => {
+        authFetch(`${API_URL}/research/verticals`)
+            .then(res => res.ok ? res.json() : [])
+            .then(setVerticals)
+            .catch(() => setVerticals([]));
+    }, [authFetch]);
 
     // Get all products from all brands
     const allProducts = brands.flatMap(brand =>
@@ -23,7 +35,8 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
         colors: { primary: '#3B82F6', secondary: '#10B981', highlight: '#F59E0B' },
         voice: '',
         products: [],
-        profileIds: []
+        profileIds: [],
+        verticalId: null
     });
 
     // Linking a product/profile used to be a two-step "pick it, then click the link
@@ -129,6 +142,23 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                 rows="2"
                                 placeholder="e.g. Professional, Friendly, Witty..."
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Vertical / Niche</label>
+                            <select
+                                value={formData.verticalId || ''}
+                                onChange={e => setFormData({ ...formData, verticalId: e.target.value || null })}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">None — pick templates manually</option>
+                                {verticals.map(v => (
+                                    <option key={v.id} value={v.id}>{v.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Optional. When set, ad generation auto-suggests a winning creative blueprint from this niche's research instead of requiring manual template selection.
+                            </p>
                         </div>
                     </div>
 

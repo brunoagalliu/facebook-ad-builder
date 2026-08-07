@@ -61,6 +61,23 @@ export function buildComprehensivePrompt(request: ImageGenerationRequestInput): 
   parts.push(`Art Direction: ${mood}, ${lighting}, ${composition}, ${designStyle}`);
   parts.push("High quality, photorealistic, 4k, advertising standard");
 
+  // A WinningAd's Gemini-deconstructed blueprint (winnerPromotionService.ts or the
+  // manual Ad Remix /deconstruct flow) — layout/visual-style guidance the wizard's
+  // template selection already carries into this request, but which nothing actually
+  // read until now.
+  const blueprint = template.blueprint_json as
+    | { layout_framework?: string; visual_style_guide?: string; psychological_triggers?: string[] }
+    | undefined;
+  if (blueprint?.layout_framework) {
+    parts.push(`Layout: ${blueprint.layout_framework}`);
+  }
+  if (blueprint?.visual_style_guide) {
+    parts.push(`Visual Style Reference: ${blueprint.visual_style_guide}`);
+  }
+  if (blueprint?.psychological_triggers?.length) {
+    parts.push(`Evoke: ${blueprint.psychological_triggers.join(", ")}`);
+  }
+
   if (request.useProductImage && request.productShots.length > 0) {
     parts.push(PRODUCT_FIDELITY_CLAUSE);
   }

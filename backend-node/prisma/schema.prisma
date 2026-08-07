@@ -77,12 +77,19 @@ model Brand {
   secondaryColor String   @default("#10B981") @map("secondary_color")
   highlightColor String   @default("#F59E0B") @map("highlight_color")
   voice          String?
+  // Optional, user-assigned — lets generation auto-pick the best-fitting WinningAd
+  // blueprint for this brand's niche (blueprintSelectionService.ts) instead of
+  // requiring manual template browsing every time. Deliberately manual rather than
+  // LLM-classified from voice/product text: predictable and free, at the cost of the
+  // user having to set it once per brand.
+  verticalId     String?  @map("vertical_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
   products     Product[]
   profiles     CustomerProfile[] @relation("BrandProfiles")
   generatedAds GeneratedAd[]
+  vertical     Vertical?         @relation(fields: [verticalId], references: [id], onDelete: SetNull)
 
   @@map("brands")
 }
@@ -182,37 +189,41 @@ model FacebookAd {
 // ---------- Templates / Ad Remix / Generated ads ----------
 
 model WinningAd {
-  id                  String    @id @default(uuid())
-  name                String
-  imageUrl            String    @map("image_url")
-  notes               String?
-  tags                String?
-  analysis            String?
-  recreationPrompt    String?   @map("recreation_prompt")
-  topic               String?
-  mood                String?
-  subjectMatter       String?   @map("subject_matter")
-  copyAnalysis        String?   @map("copy_analysis")
-  productName         String?   @map("product_name")
-  category            String?
-  designStyle         String?   @map("design_style")
-  filename            String?
-  structuralAnalysis  String?   @map("structural_analysis")
-  layering            String?
-  templateStructure   Json?     @map("template_structure")
-  colorPalette        Json?     @map("color_palette")
-  typographySystem    Json?     @map("typography_system")
-  copyPatterns        Json?     @map("copy_patterns")
-  visualElements      Json?     @map("visual_elements")
-  templateCategory    String?   @map("template_category")
-  blueprintJson       Json?     @map("blueprint_json")
-  blueprintAnalyzedAt DateTime? @map("blueprint_analyzed_at")
+  id                    String    @id @default(uuid())
+  name                  String
+  imageUrl              String    @map("image_url")
+  notes                 String?
+  tags                  String?
+  analysis              String?
+  recreationPrompt      String?   @map("recreation_prompt")
+  topic                 String?
+  mood                  String?
+  subjectMatter         String?   @map("subject_matter")
+  copyAnalysis          String?   @map("copy_analysis")
+  productName           String?   @map("product_name")
+  category              String?
+  designStyle           String?   @map("design_style")
+  filename              String?
+  structuralAnalysis    String?   @map("structural_analysis")
+  layering              String?
+  templateStructure     Json?     @map("template_structure")
+  colorPalette          Json?     @map("color_palette")
+  typographySystem      Json?     @map("typography_system")
+  copyPatterns          Json?     @map("copy_patterns")
+  visualElements        Json?     @map("visual_elements")
+  templateCategory      String?   @map("template_category")
+  blueprintJson         Json?     @map("blueprint_json")
+  blueprintAnalyzedAt   DateTime? @map("blueprint_analyzed_at")
   // Set only for auto-promoted blueprints (winnerPromotionService.ts) — null for
   // manually uploaded templates. verticalId lets "top winners per vertical" queries
   // work; sourceScrapedAdId is unique so the same scraped ad is never promoted twice.
-  verticalId          String?   @map("vertical_id")
-  sourceScrapedAdId   String?   @unique @map("source_scraped_ad_id")
-  createdAt           DateTime  @default(now()) @map("created_at")
+  verticalId            String?   @map("vertical_id")
+  sourceScrapedAdId     String?   @unique @map("source_scraped_ad_id")
+  // The source ad's run_duration_days at promotion time (see researchService.ts's
+  // computeRunDurationDays) — lets blueprintSelectionService.ts rank auto-promoted
+  // blueprints by strength instead of picking arbitrarily among a vertical's pool.
+  sourceRunDurationDays Int?      @map("source_run_duration_days")
+  createdAt             DateTime  @default(now()) @map("created_at")
 
   generatedAds    GeneratedAd[]
   vertical        Vertical?     @relation(fields: [verticalId], references: [id], onDelete: SetNull)
@@ -260,6 +271,7 @@ model Vertical {
   searchLogs    SearchLog[]
   facebookPages FacebookPage[]
   winningAds    WinningAd[]
+  brands        Brand[]
 
   @@map("verticals")
 }

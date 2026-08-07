@@ -22,6 +22,8 @@ export default function ImageAds() {
     const [selectedCopy, setSelectedCopy] = useState(null);
     const [customImagePrompt, setCustomImagePrompt] = useState('');
     const [templateMode, setTemplateMode] = useState('style'); // 'style' or 'template'
+    const [autoSuggestedTemplate, setAutoSuggestedTemplate] = useState(null);
+    const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
     // Load saved campaign details from localStorage on mount
     const [wizardData, setWizardData] = useState(() => {
@@ -59,6 +61,25 @@ export default function ImageAds() {
             localStorage.setItem('imageAds_campaignDetails', JSON.stringify(wizardData.campaignDetails));
         }
     }, [wizardData.campaignDetails]);
+
+    // When the selected brand has a vertical assigned, fetch the best-fitting
+    // WinningAd blueprint for it (backend picks from a rotating top-N pool by
+    // research-derived strength — see blueprintSelectionService.ts) so Step 4 can
+    // offer it as a one-click suggestion instead of requiring manual browsing.
+    useEffect(() => {
+        const brandId = wizardData.brand?.id;
+        const verticalId = wizardData.brand?.verticalId;
+        if (!brandId || !verticalId) {
+            setAutoSuggestedTemplate(null);
+            return;
+        }
+        setLoadingSuggestion(true);
+        authFetch(`${API_URL}/generated-ads/auto-template?brand_id=${brandId}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(setAutoSuggestedTemplate)
+            .catch(() => setAutoSuggestedTemplate(null))
+            .finally(() => setLoadingSuggestion(false));
+    }, [wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
 
     const steps = [
         { id: 1, name: 'Brand', icon: Briefcase },
@@ -370,6 +391,34 @@ export default function ImageAds() {
                         <p className="text-gray-600 mb-6">
                             Choose a proven ad style archetype or browse existing templates
                         </p>
+
+                        {loadingSuggestion && (
+                            <div className="mb-6 text-sm text-gray-500">Checking research for a suggested blueprint...</div>
+                        )}
+                        {autoSuggestedTemplate && (
+                            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    {autoSuggestedTemplate.image_url && (
+                                        <img src={autoSuggestedTemplate.image_url} alt="" className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-semibold text-amber-900 flex items-center gap-1">
+                                            <Sparkles size={14} /> Suggested from research
+                                        </div>
+                                        <div className="text-sm text-gray-700 truncate">{autoSuggestedTemplate.name}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        updateData('template', { type: 'template', ...autoSuggestedTemplate });
+                                        nextStep();
+                                    }}
+                                    className="flex-shrink-0 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium text-sm"
+                                >
+                                    Use this
+                                </button>
+                            </div>
+                        )}
 
                         {/* Mode Toggle */}
                         <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
@@ -1131,6 +1180,18 @@ Style: ${designStyle}`);
 
         // 5. QUALITY STANDARDS
         sections.push(`**Quality:** High quality, photorealistic, 4k, advertising standard`);
+
+        // 5b. BLUEPRINT (a WinningAd's Gemini-deconstructed structure, when the
+        // selected template is a promoted/uploaded blueprint rather than a plain
+        // style archetype — mirrors backend imageGenerationService.ts's equivalent.)
+        const blueprint = wizardData.template?.blueprint_json;
+        if (blueprint) {
+            const blueprintLines = [];
+            if (blueprint.layout_framework) blueprintLines.push(`Layout: ${blueprint.layout_framework}`);
+            if (blueprint.visual_style_guide) blueprintLines.push(`Visual Style Reference: ${blueprint.visual_style_guide}`);
+            if (blueprint.psychological_triggers?.length) blueprintLines.push(`Evoke: ${blueprint.psychological_triggers.join(', ')}`);
+            if (blueprintLines.length > 0) sections.push(blueprintLines.join('\n'));
+        }
 
         // 6. PRODUCT FIDELITY (only when a real product photo is supplied) & QUALITY NEGATIVES
         // Mirrors backend imageGenerationService.js's PRODUCT_FIDELITY_CLAUSE /

@@ -7,8 +7,10 @@ import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
 import { videoGenerationRequestSchema } from "../schemas/videoGeneration";
+import { selectBlueprintForBrand } from "../services/blueprintSelectionService";
 import { generateImages } from "../services/imageGenerationService";
 import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
+import { serialize as serializeWinningAd } from "./templates";
 
 const router = Router();
 
@@ -25,6 +27,25 @@ router.post(
       // real cause instead of letting it fall through to the generic 500 handler.
       res.status(502).json({ detail: (err as Error).message || "Image generation failed" });
     }
+  })
+);
+
+// Auto-picks the best-fitting WinningAd blueprint for a brand's vertical
+// (blueprintSelectionService.ts) — lets the wizard pre-fill a template instead of
+// forcing the user through manual browsing every time. Returns null (not 404) when
+// the brand has no vertical or the vertical has no analyzed blueprints yet — this is
+// an optional smart default, not a required lookup.
+router.get(
+  "/auto-template",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const brandId = req.query.brand_id as string | undefined;
+    if (!brandId) {
+      res.status(422).json({ detail: "brand_id is required" });
+      return;
+    }
+    const blueprint = await selectBlueprintForBrand(brandId);
+    res.json(blueprint ? serializeWinningAd(blueprint) : null);
   })
 );
 
