@@ -17,10 +17,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/node-18+-green.svg" alt="Node 18+">
   <img src="https://img.shields.io/badge/react-19-61dafb.svg" alt="React 19">
-  <img src="https://img.shields.io/badge/fastapi-0.100+-009688.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/express-4-000000.svg" alt="Express">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License">
 </p>
 
@@ -84,7 +83,6 @@ Manage Facebook campaigns directly:
 ### Prerequisites
 
 - **Node.js** 18+ ([download](https://nodejs.org))
-- **Python** 3.11+ ([download](https://python.org))
 - **PostgreSQL** 15+ (local or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
 
 ### Option 1: Interactive Setup (Recommended)
@@ -115,10 +113,8 @@ git clone https://github.com/yourusername/facebook_ad_builder.git
 cd facebook_ad_builder
 
 # Backend
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+cd backend-node
+npm install
 
 # Frontend
 cd ../frontend
@@ -136,18 +132,17 @@ Edit `.env.local` with your credentials. See [Environment Variables](#environmen
 #### 3. Initialize Database
 
 ```bash
-cd backend
-source venv/bin/activate
-python init_db.py
+cd backend-node
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
 ```
 
 #### 4. Start the Application
 
 ```bash
 # Terminal 1: Backend
-cd backend
-source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+cd backend-node
+npm run dev
 
 # Terminal 2: Frontend
 cd frontend
@@ -162,7 +157,6 @@ npm run dev
 |---------|-----|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8000 |
-| API Documentation | http://localhost:8000/api/v1/docs |
 
 ---
 
@@ -307,21 +301,22 @@ Navigate to **Campaigns**
 
 ```
 facebook_ad_builder/
-├── backend/                 # Python FastAPI
-│   ├── app/
-│   │   ├── api/v1/         # REST endpoints
-│   │   │   ├── brands.py
-│   │   │   ├── products.py
-│   │   │   ├── research.py
-│   │   │   ├── ad_remix.py
-│   │   │   └── facebook.py
+├── backend-node/            # Node.js + TypeScript (Express, Prisma)
+│   ├── src/
+│   │   ├── routes/         # REST endpoints
+│   │   │   ├── brands.ts
+│   │   │   ├── products.ts
+│   │   │   ├── research.ts
+│   │   │   ├── adRemix.ts
+│   │   │   └── facebook.ts
 │   │   ├── services/       # Business logic
-│   │   │   ├── facebook_service.py
-│   │   │   ├── ad_remix_service.py
-│   │   │   └── scraper.py
-│   │   ├── models.py       # SQLAlchemy models
-│   │   └── main.py         # FastAPI app
-│   └── requirements.txt
+│   │   │   ├── facebookService.ts
+│   │   │   ├── adRemixService.ts
+│   │   │   └── scraperService.ts
+│   │   ├── app.ts          # Express app wiring
+│   │   └── index.ts        # Entry point
+│   ├── prisma/             # Schema, migrations, seed
+│   └── package.json
 ├── frontend/               # React + Vite
 │   ├── src/
 │   │   ├── pages/         # Route components
@@ -337,7 +332,7 @@ facebook_ad_builder/
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 19, Vite, TailwindCSS |
-| Backend | Python 3.11+, FastAPI, SQLAlchemy |
+| Backend | Node.js, TypeScript, Express, Prisma |
 | Database | PostgreSQL |
 | AI | Google Gemini, Fal.ai |
 | Storage | Cloudflare R2 |
@@ -346,8 +341,6 @@ facebook_ad_builder/
 ---
 
 ## API Reference
-
-Interactive API documentation is available at `/api/v1/docs` when running the backend.
 
 ### Key Endpoints
 
@@ -385,8 +378,8 @@ cd frontend
 npm run test:unit
 
 # Backend
-cd backend
-pytest
+cd backend-node
+npm test
 ```
 
 ---
@@ -413,7 +406,7 @@ Deploy to [Railway](https://railway.app) in minutes:
 
 ```bash
 # Backend
-cd backend
+cd backend-node
 docker build -t fb-ad-backend .
 docker run -p 8000:8000 --env-file ../.env.local fb-ad-backend
 
@@ -493,5 +486,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
-  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
+  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using Express, React, and AI
 </p>

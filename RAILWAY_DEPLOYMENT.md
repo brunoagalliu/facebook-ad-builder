@@ -5,7 +5,7 @@ This guide walks you through deploying the Facebook Ad Builder to Railway.
 ## Overview
 
 Railway will host:
-- **Backend Service**: Python FastAPI application (Docker container)
+- **Backend Service** (`backend-node`): Node.js/TypeScript (Express, Prisma) application (Docker container)
 - **Frontend Service**: React/Vite static site
 - **PostgreSQL Database**: Managed database service
 
@@ -36,7 +36,7 @@ Railway should automatically detect your backend service from `railway.toml`.
 
 ### Set Environment Variables
 
-1. Click on the **backend** service
+1. Click on the **backend-node** service
 2. Go to the **"Variables"** tab
 3. Add the following environment variables:
 
@@ -52,20 +52,17 @@ VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
 
 ### Initialize Database Schema
 
-After the first deployment:
+The `backend-node` Docker image runs `npx prisma migrate deploy` automatically on every startup (see its Dockerfile `CMD`), so table creation needs no manual step. What does need a one-time run is the **seed script** — it creates the default roles/permissions and, if `ADMIN_EMAIL`/`ADMIN_PASSWORD` are set as service variables, a bootstrap superuser (there is no public self-registration route).
 
-1. Click on the **backend** service
-2. Go to the **"Deployments"** tab
-3. Click on the latest deployment
-4. Click **"View Logs"**
-5. Once the service is running, go to the **"Settings"** tab
-6. Under **"Deploy"**, find the **"Custom Start Command"** section
-7. Temporarily change the start command to: `python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-8. Trigger a new deployment
-9. After the database is initialized, change the start command back to: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+After the first deployment, using the [Railway CLI](#railway-cli-optional):
+
+```bash
+railway link          # select this project / the backend-node service
+railway run npx tsx prisma/seed.ts
+```
 
 > [!TIP]
-> Alternatively, you can run `python init_db.py` using Railway's CLI or by connecting to the service shell.
+> The seed script is idempotent — safe to re-run on redeploys. Set `ADMIN_EMAIL`/`ADMIN_PASSWORD` as service variables before running it if you need the bootstrap superuser created.
 
 ## Step 4: Configure Frontend Service
 
@@ -76,7 +73,7 @@ After the first deployment:
 3. Add the following environment variables:
 
 ```
-VITE_API_URL=${{backend.RAILWAY_PUBLIC_DOMAIN}}
+VITE_API_URL=${{backend-node.RAILWAY_PUBLIC_DOMAIN}}
 VITE_SUPABASE_URL=your_supabase_url_here
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
@@ -84,7 +81,7 @@ VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
 ```
 
 > [!IMPORTANT]
-> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Make sure to include `https://` prefix: `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}`
+> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Make sure to include `https://` prefix: `https://${{backend-node.RAILWAY_PUBLIC_DOMAIN}}`
 
 ### Enable Public Networking
 
@@ -108,10 +105,9 @@ If you need to manually trigger a deployment:
 
 ### Check Backend
 
-1. Get your backend URL from the backend service settings
+1. Get your backend URL from the backend-node service settings
 2. Visit `https://your-backend-url.railway.app/health`
 3. You should see: `{"status": "healthy"}`
-4. Visit `https://your-backend-url.railway.app/api/v1/docs` to see the API documentation
 
 ### Check Frontend
 
@@ -170,8 +166,8 @@ If you need to manually trigger a deployment:
 ### Database Schema Not Initialized
 
 **Error: "relation does not exist"**
-- You need to run `python init_db.py` to create the database tables
-- Follow the database initialization steps in Step 3
+- Migrations run automatically on every deploy (Dockerfile `CMD`); check deploy logs for a failed `prisma migrate deploy`
+- If roles/permissions/admin user are missing, run the seed script — see Step 3
 
 ### Build Failures
 
@@ -181,7 +177,7 @@ If you need to manually trigger a deployment:
 - Check build logs for specific errors
 
 **Backend build fails**
-- Verify all Python dependencies are in `requirements.txt`
+- Verify all dependencies are in `backend-node/package.json`
 - Check that the Dockerfile is in the correct location
 - Review build logs for missing system dependencies
 
@@ -211,8 +207,8 @@ railway link
 # View logs
 railway logs
 
-# Run commands in the backend service
-railway run python init_db.py
+# Run commands in the backend-node service
+railway run npx tsx prisma/seed.ts
 
 # Open service in browser
 railway open

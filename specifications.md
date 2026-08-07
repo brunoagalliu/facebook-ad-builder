@@ -16,14 +16,14 @@ This document serves as the Source of Truth for the Facebook Ad Automation App. 
 - **Notifications**: Toast notification system (Mandatory)
 
 ### Backend
-- **Framework**: Python FastAPI
-- **Runtime**: Python 3.11+
+- **Framework**: Express (Node.js)
+- **Runtime**: Node.js 18+, TypeScript
 - **Database**: PostgreSQL (REQUIRED)
-    - **Driver**: `psycopg2-binary`
-    - **ORM**: SQLAlchemy
-    - **Migrations**: Alembic (Recommended)
+    - **Driver**: `pg` (via Prisma's driver adapter)
+    - **ORM**: Prisma
+    - **Migrations**: Prisma Migrate
     - **NOTE**: SQLite is DEPRECATED and must not be used.
-- **Task Queue**: Celery + Redis (for long-running tasks)
+- **Scheduled Tasks**: `node-cron` (in-process, for long-running/periodic tasks)
 
 ### Infrastructure
 - **Containerization**: Docker
@@ -32,18 +32,16 @@ This document serves as the Source of Truth for the Facebook Ad Automation App. 
 ## 3. Security & Standards (CRITICAL)
 
 ### Authentication & Authorization
-- **Auth Provider**: Supabase Auth or Custom JWT.
-- **Middleware**: All protected routes MUST be secured via `Depends(verify_token)`.
+- **Auth Provider**: Custom JWT (access + refresh tokens).
+- **Middleware**: All protected routes MUST be secured via `requireAuth`/`requirePermission(...)`/`requireSuperuser` Express middleware.
 - **RBAC**: Implement Role-Based Access Control where necessary.
 - **CORS**: Strict `allow_origins` policy (Development: `localhost:5173`, Production: Specific Domain). **Wildcard `*` is PROHIBITED in production.**
 
 ### Code Formatting & Style
-**Backend (Python)**
-- **Style Guide**: PEP 8
-- **Formatter**: `Black` (Line length: 88)
-- **Linter**: `Flake8` or `Ruff`
-- **Imports**: Sorted via `isort`
-- **Naming**: `snake_case` for functions/variables, `PascalCase` for classes.
+**Backend (TypeScript)**
+- **Formatter**: `Prettier`
+- **Linter**: `ESLint`
+- **Naming**: `camelCase` for functions/variables, `PascalCase` for classes/types.
 
 **Frontend (JavaScript/React)**
 - **Style Guide**: Airbnb or Standard JS
@@ -97,23 +95,24 @@ The project follows a modular structure. API routes are versioned (`/api/v1`).
 
 ```
 /
-├── backend/
-│   ├── app/
-│   │   ├── main.py          # App entry & CORS
-│   │   ├── core/            # Config, Security
-│   │   ├── models/          # SQLAlchemy Models
-│   │   ├── schemas/         # Pydantic Schemas
-│   │   ├── services/        # Business Logic (Facebook, AI, Scraper)
-│   │   └── api/
-│   │       └── v1/          # Route Handlers
-│   │           ├── brands.py
-│   │           ├── products.py
-│   │           ├── facebook.py      # Campaign Management
-│   │           ├── generated_ads.py # Ad Creation
-│   │           ├── research.py      # Competitor Analysis
-│   │           ├── uploads.py       # File Management
-│   │           └── dashboard.py     # Analytics
-│   └── requirements.txt
+├── backend-node/
+│   ├── src/
+│   │   ├── app.ts            # Express app wiring & CORS
+│   │   ├── index.ts          # Entry point
+│   │   ├── core/             # Config, Security, Prisma client
+│   │   ├── schemas/          # Zod Schemas
+│   │   ├── middleware/       # Auth, validation
+│   │   ├── services/         # Business Logic (Facebook, AI, Scraper)
+│   │   └── routes/           # Route Handlers
+│   │       ├── brands.ts
+│   │       ├── products.ts
+│   │       ├── facebook.ts      # Campaign Management
+│   │       ├── generatedAds.ts  # Ad Creation
+│   │       ├── research.ts      # Competitor Analysis
+│   │       ├── uploads.ts       # File Management
+│   │       └── dashboard.ts     # Analytics
+│   ├── prisma/                # Schema, migrations, seed
+│   └── package.json
 │
 ├── frontend/
 │   ├── src/
@@ -145,7 +144,7 @@ The project follows a modular structure. API routes are versioned (`/api/v1`).
 - **Features**: 
     - Manage Ad Accounts, Campaigns, Ad Sets, Ads.
     - Upload Creatives.
-    - **Requirement**: Use `facebook-business` SDK.
+    - **Requirement**: Use `facebook-nodejs-business-sdk`.
 
 ### Module 5: Reporting
 - **Endpoints**: `/api/v1/dashboard`
