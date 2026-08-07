@@ -285,7 +285,13 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
   }
 }
 
-async function extractMediaFromSnapshot(snapshotUrl: string): Promise<string[]> {
+/** Plain fetch + regex over an ad-snapshot page's raw HTML — no Playwright, no FB
+ * login, so it's cheap to call on-demand (winnerPromotionService.ts uses this to
+ * fetch a real image for auto-promoting a scraped ad to a WinningAd blueprint). Hit
+ * rate may be lower than the full Playwright scrape below since Facebook's snapshot
+ * pages are JS-heavy, but this was already the existing fallback for that same reason
+ * when Playwright's network-interception doesn't capture an ad's images. */
+export async function extractMediaFromSnapshot(snapshotUrl: string): Promise<string[]> {
   const mediaUrls: string[] = [];
   try {
     const response = await fetch(snapshotUrl, { redirect: "follow" });

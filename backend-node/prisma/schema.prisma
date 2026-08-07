@@ -207,9 +207,16 @@ model WinningAd {
   templateCategory    String?   @map("template_category")
   blueprintJson       Json?     @map("blueprint_json")
   blueprintAnalyzedAt DateTime? @map("blueprint_analyzed_at")
+  // Set only for auto-promoted blueprints (winnerPromotionService.ts) — null for
+  // manually uploaded templates. verticalId lets "top winners per vertical" queries
+  // work; sourceScrapedAdId is unique so the same scraped ad is never promoted twice.
+  verticalId          String?   @map("vertical_id")
+  sourceScrapedAdId   String?   @unique @map("source_scraped_ad_id")
   createdAt           DateTime  @default(now()) @map("created_at")
 
-  generatedAds GeneratedAd[]
+  generatedAds    GeneratedAd[]
+  vertical        Vertical?     @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  sourceScrapedAd ScrapedAd?    @relation(fields: [sourceScrapedAdId], references: [id], onDelete: SetNull)
 
   @@map("winning_ads")
 }
@@ -252,6 +259,7 @@ model Vertical {
   savedSearches SavedSearch[]
   searchLogs    SearchLog[]
   facebookPages FacebookPage[]
+  winningAds    WinningAd[]
 
   @@map("verticals")
 }
@@ -359,6 +367,11 @@ model ScrapedAd {
   adLink           String   @map("ad_link")
   platforms        Json?
   startDate        String?  @map("start_date")
+  // Facebook's ad-snapshot page URL — an HTML page, not a direct image, but usable
+  // with extractMediaFromSnapshot (winnerPromotionService.ts) to fetch a real image
+  // for blueprint deconstruction. Requested from the Graph API but discarded before
+  // this, same bug pattern as impressions/spend below.
+  adSnapshotUrl    String?  @map("ad_snapshot_url")
   // Meta's ad_delivery_stop_time — present only once an ad has actually stopped
   // running; null means "still active" as of the last time we saw it. Together with
   // startDate this is the run-duration "winner" signal: Meta only populates
@@ -385,6 +398,7 @@ model ScrapedAd {
 
   savedSearch  SavedSearch?  @relation(fields: [searchId], references: [id], onDelete: Cascade)
   facebookPage FacebookPage? @relation(fields: [facebookPageId], references: [id], onDelete: SetNull)
+  winningAd    WinningAd?
 
   @@map("scraped_ads")
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../core/prisma";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { requirePermission } from "../middleware/auth";
 import { requireCronSecret } from "../middleware/cronSecret";
 import { validateBody } from "../middleware/validate";
 import { adSearchRequestSchema, brandScrapeCreateSchema } from "../schemas/research";
@@ -21,6 +22,7 @@ import {
   searchAdsWithoutSaving,
 } from "../services/researchService";
 import { runScheduledSearches } from "../services/schedulerService";
+import { promoteTopAdsForVertical } from "../services/winnerPromotionService";
 
 const router = Router();
 
@@ -284,6 +286,31 @@ router.post(
       description: vertical.description,
       created_at: vertical.createdAt ? vertical.createdAt.toISOString() : null,
     });
+  })
+);
+
+// Gated like templates.ts's manual /upload route (also creates WinningAd rows) —
+// unlike the rest of this router, which has no auth (matching the original Python app).
+router.post(
+  "/verticals/:verticalId/promote-winners",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    const { verticalId } = req.params;
+    const vertical = await prisma.vertical.findUnique({ where: { id: verticalId } });
+    if (!vertical) {
+      res.status(404).json({ detail: "Vertical not found" });
+      return;
+    }
+
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const minRunDurationDays = req.query.min_run_duration_days ? Number(req.query.min_run_duration_days) : undefined;
+
+    try {
+      const result = await promoteTopAdsForVertical(verticalId, { limit, minRunDurationDays });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ detail: `Promotion failed: ${(err as Error).message}` });
+    }
   })
 );
 

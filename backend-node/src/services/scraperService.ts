@@ -31,6 +31,8 @@ export interface ScrapedAdCreate {
   spend_lower?: number | null;
   spend_upper?: number | null;
   currency?: string | null;
+  // Facebook's ad-snapshot page — see the schema comment on ScrapedAd.adSnapshotUrl.
+  ad_snapshot_url?: string | null;
 }
 
 /** Meta returns impressions/spend as {lower_bound, upper_bound} range objects (string
@@ -93,6 +95,7 @@ function parseApiAd(adData: Record<string, unknown>): ScrapedAdCreate | null {
     platforms,
     start_date: (adData.ad_delivery_start_time as string) ?? null,
     stop_date: (adData.ad_delivery_stop_time as string) ?? null,
+    ad_snapshot_url: (adData.ad_snapshot_url as string) ?? null,
     media_type: "image",
     impressions_lower: impressions.lower,
     impressions_upper: impressions.upper,

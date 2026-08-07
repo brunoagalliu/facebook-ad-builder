@@ -125,6 +125,7 @@ export async function searchAndSave(request: AdSearchRequestInput) {
           platforms: adData.platforms ?? undefined,
           startDate: adData.start_date,
           stopDate: adData.stop_date,
+          adSnapshotUrl: adData.ad_snapshot_url,
           mediaType: adData.media_type,
           impressionsLower: adData.impressions_lower,
           impressionsUpper: adData.impressions_upper,
