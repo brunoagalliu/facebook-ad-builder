@@ -223,6 +223,16 @@ model WinningAd {
   // computeRunDurationDays) — lets blueprintSelectionService.ts rank auto-promoted
   // blueprints by strength instead of picking arbitrarily among a vertical's pool.
   sourceRunDurationDays Int?      @map("source_run_duration_days")
+  // Stage 4: video-native blueprints (videoBlueprintService.ts, Gemini video
+  // understanding) — separate shape from blueprintJson's image-composition fields
+  // (hook/pacing/cinematography/dialogue instead of layout/visual-style), since a
+  // video ad's structure isn't describable in image-blueprint terms. mediaType
+  // records which kind of source this blueprint came from; imageUrl stays required
+  // (a thumbnail/placeholder for video rows) so every existing image_url consumer in
+  // the frontend keeps working unchanged.
+  mediaType             String    @default("image") @map("media_type")
+  videoUrl              String?   @map("video_url")
+  videoBlueprintJson    Json?     @map("video_blueprint_json")
   createdAt             DateTime  @default(now()) @map("created_at")
 
   generatedAds    GeneratedAd[]

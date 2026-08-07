@@ -19,9 +19,17 @@ import { deconstructTemplate } from "./adRemixService";
 import { extractMediaFromSnapshot } from "./brandScraperService";
 import { computeRunDurationDays } from "./researchService";
 import { uploadFile } from "./storage";
+import { deconstructVideoTemplate } from "./videoBlueprintService";
 
 const DEFAULT_LIMIT = 3;
 const DEFAULT_MIN_RUN_DURATION_DAYS = 14;
+
+// WinningAd.imageUrl is required (every existing frontend consumer renders it as an
+// <img src>) — video-sourced blueprints that have no separate thumbnail in their ad
+// snapshot fall back to this rather than requiring five frontend files to learn to
+// handle a null image_url. Same placehold.co fallback pattern imageGenerationService.ts
+// already uses when Fal.ai isn't configured.
+const VIDEO_PLACEHOLDER_IMAGE_URL = "https://placehold.co/600x400/1f2937/f59e0b/png?text=Video+Ad";
 
 export interface PromotionResult {
   promoted: { winning_ad_id: string; scraped_ad_id: string; headline: string | null; run_duration_days: number | null }[];
@@ -36,6 +44,19 @@ async function downloadAndUploadImage(imageUrl: string, scrapedAdId: string): Pr
   const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
   const filename = `winner_${scrapedAdId}_${randomUUID()}.${ext}`;
   return uploadFile(buffer, filename, contentType);
+}
+
+async function downloadAndUploadVideo(videoUrl: string, scrapedAdId: string): Promise<string> {
+  const response = await fetch(videoUrl, { signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`Failed to download video: ${response.status}`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const contentType = response.headers.get("content-type") ?? "video/mp4";
+  const filename = `winner_${scrapedAdId}_${randomUUID()}.mp4`;
+  return uploadFile(buffer, filename, contentType);
+}
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov)(\?|$)/i.test(url);
 }
 
 /** Promotes one specific scraped ad into a WinningAd blueprint, regardless of its
@@ -54,25 +75,31 @@ export async function promoteScrapedAd(
   });
   if (!ad) throw new Error("Scraped ad not found");
   if (ad.winningAd) throw new Error("This ad has already been promoted to a winning ad");
-  if (!ad.adSnapshotUrl) throw new Error("This ad has no snapshot available to extract an image from");
+  if (!ad.adSnapshotUrl) throw new Error("This ad has no snapshot available to extract media from");
 
-  const imageUrls = await extractMediaFromSnapshot(ad.adSnapshotUrl);
-  const imageUrl = imageUrls[0];
-  if (!imageUrl) throw new Error("No image found in ad snapshot");
+  // extractMediaFromSnapshot returns a mixed list (images first, then videos) — split
+  // by extension so a video ad gets video-blueprint treatment instead of being fed to
+  // Gemini's image deconstruction as if it were a photo.
+  const mediaUrls = await extractMediaFromSnapshot(ad.adSnapshotUrl);
+  const videoUrl = mediaUrls.find(isVideoUrl);
+  const imageUrl = mediaUrls.find((u) => !isVideoUrl(u));
+  if (!videoUrl && !imageUrl) throw new Error("No image or video found in ad snapshot");
 
-  const uploadedUrl = await downloadAndUploadImage(imageUrl, ad.id);
   const runDurationDays = computeRunDurationDays(ad.startDate, ad.stopDate);
+  const label = source === "auto" ? "Auto-promoted" : "Manually marked as a winner";
+  const notes =
+    runDurationDays !== null ? `${label} from research: running ${runDurationDays} days as of promotion.` : `${label} from research.`;
+
+  const uploadedImageUrl = imageUrl ? await downloadAndUploadImage(imageUrl, ad.id) : VIDEO_PLACEHOLDER_IMAGE_URL;
 
   const winningAd = await prisma.winningAd.create({
     data: {
       name: `${ad.brandName ?? "Unknown"} — ${ad.headline ?? "Untitled"}`.slice(0, 200),
-      imageUrl: uploadedUrl,
+      imageUrl: uploadedImageUrl,
+      mediaType: videoUrl ? "video" : "image",
       templateCategory: source === "auto" ? "Auto-promoted" : "Manually promoted",
       productName: ad.brandName,
-      notes:
-        runDurationDays !== null
-          ? `${source === "auto" ? "Auto-promoted" : "Manually marked as a winner"} from research: running ${runDurationDays} days as of promotion.`
-          : `${source === "auto" ? "Auto-promoted" : "Manually marked as a winner"} from research.`,
+      notes,
       verticalId: ad.savedSearch?.verticalId ?? null,
       sourceScrapedAdId: ad.id,
       sourceRunDurationDays: runDurationDays,
@@ -80,15 +107,23 @@ export async function promoteScrapedAd(
   });
 
   try {
-    const blueprint = await deconstructTemplate(uploadedUrl);
-    await prisma.winningAd.update({
-      where: { id: winningAd.id },
-      data: { blueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
-    });
+    if (videoUrl) {
+      const uploadedVideoUrl = await downloadAndUploadVideo(videoUrl, ad.id);
+      const blueprint = await deconstructVideoTemplate(uploadedVideoUrl);
+      await prisma.winningAd.update({
+        where: { id: winningAd.id },
+        data: { videoUrl: uploadedVideoUrl, videoBlueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
+      });
+    } else {
+      const blueprint = await deconstructTemplate(uploadedImageUrl);
+      await prisma.winningAd.update({
+        where: { id: winningAd.id },
+        data: { blueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
+      });
+    }
   } catch (err) {
-    // The WinningAd row (with its image) still exists — deconstruction can be
-    // retried later via the existing POST /ad-remix/deconstruct, so a Gemini
-    // failure here shouldn't roll back the promotion itself.
+    // The WinningAd row (with its media) still exists — deconstruction can be
+    // retried later, so a Gemini failure here shouldn't roll back the promotion.
     console.error(`Blueprint deconstruction failed for winning ad ${winningAd.id}:`, err);
   }
 

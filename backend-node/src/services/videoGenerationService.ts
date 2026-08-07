@@ -35,12 +35,22 @@ import { randomUUID } from "crypto";
 
 import { settings } from "../core/config";
 import { CharacterInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
-import { selectBlueprintForBrand } from "./blueprintSelectionService";
+import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "./blueprintSelectionService";
 import { uploadFile } from "./storage";
 
+// Covers both blueprint shapes this can be fed: a real video blueprint
+// (videoBlueprintService.ts — hook_type/pacing_and_cuts/cinematography_style/
+// authenticity_signals) when one exists for the brand's vertical, or the older
+// text-level fallback pulled from an image blueprint's narrative_arc/
+// psychological_triggers (stage 3) when it doesn't. createVideoTask prefers the
+// former since it's genuinely video-native, not adapted from image composition.
 interface VideoBlueprintInsight {
   narrative_arc?: string;
   psychological_triggers?: string[];
+  hook_type?: string;
+  pacing_and_cuts?: string;
+  cinematography_style?: string;
+  authenticity_signals?: string[];
 }
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
@@ -96,21 +106,32 @@ export function buildVideoPrompt(
   const actions = request.scenes.map((s) => s.action).join("\n");
 
   const inspirationParts = [
+    blueprintInsight?.hook_type ? `structure the opening 2-3 seconds as a "${blueprintInsight.hook_type}" hook` : "",
     blueprintInsight?.narrative_arc ? `narrative arc: ${blueprintInsight.narrative_arc}` : "",
     blueprintInsight?.psychological_triggers?.length
       ? `emotional triggers to evoke: ${blueprintInsight.psychological_triggers.join(", ")}`
       : "",
   ].filter(Boolean);
 
+  const cinematographyLine = [
+    "Cinematography: Camera Shot: Medium close-up, slightly high angle, mostly stable framing with a slight gentle drift. Lens & DOF: IPHONE 15 PRO front camera (~24mm), no depth of field. Camera Motion: Subtle, natural handheld sway. Lighting: Bright, soft natural light. Color & Grade: neutral warm daylight palette with accurate, natural skin texture; no filters applied.",
+    blueprintInsight?.cinematography_style ? `Reference shooting style from a proven winner in this niche: ${blueprintInsight.cinematography_style}` : "",
+    blueprintInsight?.pacing_and_cuts ? `Pacing: ${blueprintInsight.pacing_and_cuts}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const authenticityKeywords = [UGC_AUTHENTICITY_KEYWORDS, ...(blueprintInsight?.authenticity_signals ?? [])].join(", ");
+
   const parts = [
     `A casual, selfie-style IPHONE 15 PRO front-camera vertical video (9:16) filmed in ${location}, titled "${filename}".`,
     characterClause,
     hasProductRef ? PRODUCT_FIDELITY_CLAUSE : "",
-    "Cinematography: Camera Shot: Medium close-up, slightly high angle, mostly stable framing with a slight gentle drift. Lens & DOF: IPHONE 15 PRO front camera (~24mm), no depth of field. Camera Motion: Subtle, natural handheld sway. Lighting: Bright, soft natural light. Color & Grade: neutral warm daylight palette with accurate, natural skin texture; no filters applied.",
+    cinematographyLine,
     inspirationParts.length ? `Creative Inspiration (from research on what's winning in this niche): ${inspirationParts.join("; ")}.` : "",
     `Actions:\n${actions}`,
     "Audio & Ambience: Crisp, clear voice with natural room tone. No music, no cuts; one continuous take.",
-    `UGC Authenticity Keywords: ${UGC_AUTHENTICITY_KEYWORDS}.`,
+    `UGC Authenticity Keywords: ${authenticityKeywords}.`,
     `Universal Quality Control Negatives: ${QUALITY_CONTROL_NEGATIVES}.`,
   ];
 
@@ -123,6 +144,18 @@ function buildAspectRatio(aspectRatio: VideoGenerationRequestInput["aspectRatio"
 
 function clampDuration(totalSeconds: number): number {
   return Math.min(MAX_DURATION, Math.max(MIN_DURATION, totalSeconds));
+}
+
+/** Prefers a real video-native blueprint (stage 4) for the brand's vertical; falls
+ * back to the text-level insight extractable from an image blueprint (stage 3) when
+ * no video blueprint has been promoted for that vertical yet. */
+async function selectBestVideoInsight(brandId: string): Promise<VideoBlueprintInsight | undefined> {
+  const videoBlueprint = await selectVideoBlueprintForBrand(brandId);
+  if (videoBlueprint?.videoBlueprintJson) {
+    return videoBlueprint.videoBlueprintJson as VideoBlueprintInsight;
+  }
+  const imageBlueprint = await selectBlueprintForBrand(brandId);
+  return imageBlueprint?.blueprintJson as VideoBlueprintInsight | undefined;
 }
 
 interface CreateTaskResponse {
@@ -139,8 +172,7 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
   const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
 
   const brandId = (request.brand as Record<string, unknown> | undefined)?.id as string | undefined;
-  const blueprint = brandId ? await selectBlueprintForBrand(brandId) : null;
-  const blueprintInsight = blueprint?.blueprintJson as VideoBlueprintInsight | undefined;
+  const blueprintInsight = brandId ? await selectBestVideoInsight(brandId) : undefined;
 
   const input: Record<string, unknown> = {
     prompt: buildVideoPrompt(request, blueprintInsight),

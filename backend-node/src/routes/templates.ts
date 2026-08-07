@@ -43,6 +43,9 @@ export function serialize(t: WinningAd) {
     template_category: t.templateCategory,
     blueprint_json: t.blueprintJson,
     blueprint_analyzed_at: t.blueprintAnalyzedAt,
+    media_type: t.mediaType,
+    video_url: t.videoUrl,
+    video_blueprint_json: t.videoBlueprintJson,
     created_at: t.createdAt,
   };
 }
