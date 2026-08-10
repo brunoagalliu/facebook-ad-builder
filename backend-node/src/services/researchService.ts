@@ -96,9 +96,22 @@ export async function searchAndSave(request: AdSearchRequestInput) {
     }
 
     if (existing) {
+      // Backfill winner-signal fields a prior scrape may have missed (e.g. the API
+      // token wasn't configured yet, so the DOM-scraping fallback ran instead and
+      // never captured these) — only fill gaps, never overwrite a value already set.
       const updated = await prisma.scrapedAd.update({
         where: { id: existing.id },
-        data: { lastSeen: new Date(), seenCount: (existing.seenCount ?? 0) + 1 },
+        data: {
+          lastSeen: new Date(),
+          seenCount: (existing.seenCount ?? 0) + 1,
+          adSnapshotUrl: existing.adSnapshotUrl ?? adData.ad_snapshot_url,
+          stopDate: existing.stopDate ?? adData.stop_date,
+          impressionsLower: existing.impressionsLower ?? adData.impressions_lower,
+          impressionsUpper: existing.impressionsUpper ?? adData.impressions_upper,
+          spendLower: existing.spendLower ?? adData.spend_lower,
+          spendUpper: existing.spendUpper ?? adData.spend_upper,
+          currency: existing.currency ?? adData.currency,
+        },
       });
       savedAds.push(updated);
       adsDuplicate++;
