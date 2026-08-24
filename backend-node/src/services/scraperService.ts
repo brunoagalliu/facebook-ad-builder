@@ -195,6 +195,58 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+export interface AdsLibraryTokenStatus {
+  configured: boolean;
+  isValid: boolean | null;
+  expiresAt: string | null;
+  daysRemaining: number | null;
+  warning: boolean;
+}
+
+// FACEBOOK_ADS_LIBRARY_TOKEN is a 60-day long-lived User Access Token tied to a
+// personally identity-verified Facebook profile (see facebook-api-tokens memory) —
+// Meta doesn't offer a permanent/System User alternative for the ads_archive endpoint,
+// so this can't be auto-renewed. Surfaced on the Dashboard instead so it doesn't
+// silently lapse and quietly fall back to the DOM-scraping path (which never captures
+// ad_snapshot_url, breaking "Mark as Winner").
+const TOKEN_WARNING_THRESHOLD_DAYS = 10;
+
+export async function checkAdsLibraryTokenStatus(): Promise<AdsLibraryTokenStatus> {
+  const token = settings.FACEBOOK_ADS_LIBRARY_TOKEN;
+  if (!token) {
+    return { configured: false, isValid: null, expiresAt: null, daysRemaining: null, warning: true };
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`
+    );
+    const data = (await response.json()) as { data?: { is_valid?: boolean; expires_at?: number } };
+    const isValid = data.data?.is_valid ?? false;
+    const expiresAtUnix = data.data?.expires_at;
+
+    if (!expiresAtUnix) {
+      return { configured: true, isValid, expiresAt: null, daysRemaining: null, warning: !isValid };
+    }
+
+    const expiresAt = new Date(expiresAtUnix * 1000);
+    const daysRemaining = Math.floor((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    return {
+      configured: true,
+      isValid,
+      expiresAt: expiresAt.toISOString(),
+      daysRemaining,
+      warning: !isValid || daysRemaining <= TOKEN_WARNING_THRESHOLD_DAYS,
+    };
+  } catch (err) {
+    // Transient check failure (network blip, Meta hiccup) — don't flash a false-alarm
+    // banner over it, the next Dashboard load will just check again.
+    console.error("Failed to check Ads Library token status:", err);
+    return { configured: true, isValid: null, expiresAt: null, daysRemaining: null, warning: false };
+  }
+}
+
 async function fallbackSearch(
   query: string,
   limit: number,

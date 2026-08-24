@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../core/prisma";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { checkAdsLibraryTokenStatus } from "../services/scraperService";
 
 // No auth on this router, matching the Python source (dashboard.py has zero auth deps).
 const router = Router();
@@ -23,6 +24,14 @@ router.get(
       templates_count: templatesCount,
       campaigns_count: campaignsCount,
     });
+  })
+);
+
+router.get(
+  "/facebook-token-status",
+  asyncHandler(async (_req, res) => {
+    const status = await checkAdsLibraryTokenStatus();
+    res.json(status);
   })
 );
 

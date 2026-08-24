@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,6 +14,7 @@ export default function Dashboard() {
         templates_count: 0,
         campaigns_count: 0
     });
+    const [tokenStatus, setTokenStatus] = useState(null);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -28,8 +29,35 @@ export default function Dashboard() {
             }
         };
 
+        const fetchTokenStatus = async () => {
+            try {
+                const response = await authFetch(`${API_URL}/dashboard/facebook-token-status`);
+                if (response.ok) {
+                    setTokenStatus(await response.json());
+                }
+            } catch (error) {
+                console.error('Failed to fetch Facebook token status:', error);
+            }
+        };
+
         fetchStats();
+        fetchTokenStatus();
     }, [authFetch]);
+
+    const tokenWarningMessage = () => {
+        if (!tokenStatus) return null;
+        if (!tokenStatus.configured) {
+            return 'Facebook Ads Library token is not configured — ad research is falling back to slower, less reliable scraping.';
+        }
+        if (tokenStatus.isValid === false) {
+            return 'Facebook Ads Library token is no longer valid — ad research has fallen back to slower, less reliable scraping. Generate a new one via Graph API Explorer.';
+        }
+        if (tokenStatus.daysRemaining != null && tokenStatus.daysRemaining <= 10) {
+            return `Facebook Ads Library token expires in ${tokenStatus.daysRemaining} day${tokenStatus.daysRemaining === 1 ? '' : 's'} — generate a new one via Graph API Explorer before it lapses.`;
+        }
+        return null;
+    };
+    const tokenWarning = tokenWarningMessage();
 
     const stats = [
         { label: 'Total Campaigns', value: statsData.campaigns_count, icon: TrendingUp, color: 'bg-amber-500' },
@@ -54,6 +82,14 @@ export default function Dashboard() {
                 </h1>
                 <p className="text-gray-600 mt-2">Welcome to your Ad Builder workspace</p>
             </div>
+
+            {/* Facebook Ads Library token warning */}
+            {tokenWarning && (
+                <div className="mb-8 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+                    <AlertTriangle size={20} className="mt-0.5 flex-shrink-0" />
+                    <p className="text-sm font-medium">{tokenWarning}</p>
+                </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
