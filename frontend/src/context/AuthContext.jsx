@@ -35,6 +35,16 @@ export const AuthProvider = ({ children }) => {
                             // If it's a network error or 500, keep the tokens so we can try again later
                             if (refreshErr.status === 401 || refreshErr.status === 403) {
                                 logout();
+                            } else {
+                                // Tokens are presumably still fine (isAuthenticated is
+                                // token-based, so the user isn't bounced to /login for
+                                // this) — but `user` is still unset, so retry once
+                                // shortly after so their profile/roles actually load
+                                // once the backend blip passes, instead of staying
+                                // null until the next full page load.
+                                setTimeout(() => {
+                                    fetchUser().catch(() => {});
+                                }, 5000);
                             }
                         }
                     } else {
@@ -275,7 +285,12 @@ export const AuthProvider = ({ children }) => {
         accessToken,
         loading,
         error,
-        isAuthenticated: !!user,
+        // Deliberately token-based, not !!user: a transient backend blip (e.g. the
+        // few seconds a deploy restarts in) can fail the /auth/me fetch without the
+        // tokens themselves being invalid — initAuth below already knows not to call
+        // logout() for that case, so isAuthenticated shouldn't contradict it and bounce
+        // PrivateRoute to /login anyway while a perfectly good session sits unused.
+        isAuthenticated: !!accessToken,
         login,
         register,
         logout,
