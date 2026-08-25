@@ -5,7 +5,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requirePermission } from "../middleware/auth";
 import { requireCronSecret } from "../middleware/cronSecret";
 import { validateBody } from "../middleware/validate";
-import { adSearchRequestSchema, brandScrapeCreateSchema } from "../schemas/research";
+import { adSearchRequestSchema, batchDeletePagesSchema, BatchDeletePagesInput, brandScrapeCreateSchema } from "../schemas/research";
 import {
   deleteBrandScrape,
   parsePageIdFromUrl,
@@ -497,6 +497,31 @@ router.delete(
       where: { facebookPageId: pageId, searchId: { in: searchIds } },
     });
     res.json({ message: `Removed ${count} ad${count === 1 ? "" : "s"}`, count });
+  })
+);
+
+// Multi-page version of the above — lets a user clear several spam/irrelevant pages
+// (e.g. web-novel ad spam picked up by a broad keyword match) in one action instead of
+// one Delete-All-Ads click per page. Same vertical-scoping and onDelete: SetNull safety.
+router.delete(
+  "/verticals/:verticalId/pages/ads",
+  requirePermission("templates:write"),
+  validateBody(batchDeletePagesSchema),
+  asyncHandler(async (req, res) => {
+    const { verticalId } = req.params;
+    const { page_ids: pageIds } = req.body as BatchDeletePagesInput;
+
+    const searches = await prisma.savedSearch.findMany({ where: { verticalId } });
+    const searchIds = searches.map((s) => s.id);
+    if (searchIds.length === 0) {
+      res.json({ message: "Removed 0 ads", count: 0 });
+      return;
+    }
+
+    const { count } = await prisma.scrapedAd.deleteMany({
+      where: { facebookPageId: { in: pageIds }, searchId: { in: searchIds } },
+    });
+    res.json({ message: `Removed ${count} ad${count === 1 ? "" : "s"} across ${pageIds.length} page${pageIds.length === 1 ? "" : "s"}`, count });
   })
 );
 

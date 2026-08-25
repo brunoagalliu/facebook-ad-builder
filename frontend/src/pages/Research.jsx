@@ -41,6 +41,9 @@ const Research = () => {
     const [deletingAdId, setDeletingAdId] = useState(null);
     const [pagePendingDelete, setPagePendingDelete] = useState(null);
     const [deletingPageId, setDeletingPageId] = useState(null);
+    const [selectedPageIds, setSelectedPageIds] = useState(new Set());
+    const [batchDeletePending, setBatchDeletePending] = useState(false);
+    const [batchDeleting, setBatchDeleting] = useState(false);
     const [query, setQuery] = useState('');
     const [source, setSource] = useState('facebook');
     const [country, setCountry] = useState('US');
@@ -236,6 +239,57 @@ const Research = () => {
         } finally {
             setDeletingPageId(null);
             setPagePendingDelete(null);
+        }
+    };
+
+    const togglePageSelection = (pageId) => {
+        setSelectedPageIds(prev => {
+            const next = new Set(prev);
+            if (next.has(pageId)) next.delete(pageId);
+            else next.add(pageId);
+            return next;
+        });
+    };
+
+    const toggleSelectAllPages = (pageIds) => {
+        setSelectedPageIds(prev => {
+            const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+            return allSelected ? new Set() : new Set(pageIds);
+        });
+    };
+
+    const confirmBatchDeletePages = async () => {
+        if (!selectedVertical || selectedPageIds.size === 0) return;
+        setBatchDeleting(true);
+        try {
+            const pageIds = Array.from(selectedPageIds);
+            const response = await authFetch(
+                `${API_URL}/research/verticals/${selectedVertical.id}/pages/ads`,
+                {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ page_ids: pageIds }),
+                }
+            );
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to remove pages');
+            }
+            const data = await response.json().catch(() => ({}));
+            const pageIdSet = new Set(pageIds);
+            setAggregatedAds(prev => prev.filter(p => !pageIdSet.has(p.page_id)));
+            setPageAds(prev => {
+                const next = { ...prev };
+                pageIds.forEach(id => delete next[id]);
+                return next;
+            });
+            setSelectedPageIds(new Set());
+            showSuccess(data.message || 'Pages removed');
+        } catch (error) {
+            showError(error.message || 'Failed to remove pages');
+        } finally {
+            setBatchDeleting(false);
+            setBatchDeletePending(false);
         }
     };
 
@@ -645,10 +699,39 @@ const Research = () => {
 
                                         return filteredPages.length === 0 ? (
                                             <p className="text-gray-500 text-center py-8">No pages match your filter.</p>
-                                        ) : filteredPages.map((page) => (
+                                        ) : (<>
+                                        <div className="flex items-center gap-3 px-1 pb-1">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={filteredPages.length > 0 && filteredPages.every(p => selectedPageIds.has(p.page_id))}
+                                                    onChange={() => toggleSelectAllPages(filteredPages.map(p => p.page_id))}
+                                                    className="rounded border-gray-300"
+                                                />
+                                                Select all
+                                            </label>
+                                            {selectedPageIds.size > 0 && (
+                                                <div className="flex items-center gap-2 ml-auto">
+                                                    <span className="text-sm text-gray-600">{selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'} selected</span>
+                                                    <button
+                                                        onClick={() => setBatchDeletePending(true)}
+                                                        className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                                                    >
+                                                        🗑 Delete Selected
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {filteredPages.map((page) => (
                                         <div key={page.page_id} className="border border-gray-200 rounded-lg overflow-hidden">
                                             <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
                                                 <div className="flex-1 flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedPageIds.has(page.page_id)}
+                                                        onChange={() => togglePageSelection(page.page_id)}
+                                                        className="rounded border-gray-300"
+                                                    />
                                                     <span
                                                         onClick={() => togglePageExpansion(page.page_id)}
                                                         className="text-gray-600 hover:text-gray-900 transition-transform cursor-pointer select-none"
@@ -804,7 +887,8 @@ const Research = () => {
                                                 </div>
                                             )}
                                         </div>
-                                    ))
+                                    ))}
+                                    </>)
                                 })()}
                                 </div>
                             )}
@@ -1331,6 +1415,41 @@ const Research = () => {
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                             >
                                 {deletingPageId === pagePendingDelete.page_id ? 'Removing...' : 'Delete All Ads'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Batch Delete Pages Confirmation Modal */}
+            {batchDeletePending && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
+                                🗑
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Delete ads from {selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'}?</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-6">
+                            All {aggregatedAds.filter(p => selectedPageIds.has(p.page_id)).reduce((sum, p) => sum + p.total_ads, 0)} ads
+                            scraped from these {selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'} in this vertical will be permanently removed
+                            from your research dashboard. This can't be undone — any already-promoted Winning Ads blueprints will stay intact.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setBatchDeletePending(false)}
+                                disabled={batchDeleting}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmBatchDeletePages}
+                                disabled={batchDeleting}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {batchDeleting ? 'Removing...' : 'Delete Selected'}
                             </button>
                         </div>
                     </div>

@@ -23,4 +23,9 @@ export const brandScrapeCreateSchema = z.object({
   brand_name: z.string(),
   page_url: z.string(),
 });
+
+export const batchDeletePagesSchema = z.object({
+  page_ids: z.array(z.string()).min(1),
+});
+export type BatchDeletePagesInput = z.infer<typeof batchDeletePagesSchema>;
 export type BrandScrapeCreateInput = z.infer<typeof brandScrapeCreateSchema>;
