@@ -99,9 +99,16 @@ export async function searchAndSave(request: AdSearchRequestInput) {
       // Backfill winner-signal fields a prior scrape may have missed (e.g. the API
       // token wasn't configured yet, so the DOM-scraping fallback ran instead and
       // never captured these) — only fill gaps, never overwrite a value already set.
+      // Also re-point searchId at the current search: aggregated-ads (Research.jsx)
+      // filters ads by `searchId IN (searches for this vertical)`, and searchId was
+      // otherwise set once at creation and never touched again — an ad first
+      // discovered by a vertical-less or wrong-vertical search stayed permanently
+      // invisible in the correct vertical's dashboard even after re-appearing in a
+      // properly vertical-scoped search for the same query.
       const updated = await prisma.scrapedAd.update({
         where: { id: existing.id },
         data: {
+          searchId: savedSearch.id,
           lastSeen: new Date(),
           seenCount: (existing.seenCount ?? 0) + 1,
           adSnapshotUrl: existing.adSnapshotUrl ?? adData.ad_snapshot_url,
