@@ -454,14 +454,15 @@ export async function searchAds(
     try {
       const ads = await apiSearch(query, limit, country, offset, excludeIds, negativeKeywords);
 
-      let shouldFallback = false;
+      // Used to also fall back when ads.length was under half the requested limit, on
+      // the assumption that a big shortfall meant something was wrong with the API
+      // call. That assumption predates exact-phrase matching (see apiSearch's
+      // search_type) — a real exact-phrase match count is very often a small fraction
+      // of a large requested limit (confirmed live: 300 requested, ~30 real matches for
+      // "debt relief"), so the heuristic was discarding good real results in favor of
+      // Playwright DOM-scraping, which then failed in production and returned nothing.
+      // A genuine zero is still the only real "something went wrong" signal.
       if (ads.length === 0) {
-        shouldFallback = true;
-      } else if (limit >= 100 && ads.length < limit * 0.5) {
-        shouldFallback = true;
-      }
-
-      if (shouldFallback) {
         return await fallbackSearch(query, limit, country, offset, excludeIds, negativeKeywords);
       }
       return ads;
