@@ -134,6 +134,12 @@ async function apiSearch(
       access_token: accessToken,
       ad_reached_countries: country,
       search_terms: query,
+      // Meta's default (KEYWORD_UNORDERED) matches ads containing any of the search
+      // words anywhere in their creative text — verified live that for "debt relief"
+      // this pulls in web-novel/romance-app spam whose teaser copy incidentally
+      // mentions "debts" as a plot hook, drowning out real competitor ads. Exact-phrase
+      // matches what facebook.com/ads/library's own UI actually returns.
+      search_type: "KEYWORD_EXACT_PHRASE",
       ad_active_status: "ACTIVE",
       limit: String(batchSize),
       fields:
