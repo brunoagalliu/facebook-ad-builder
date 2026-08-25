@@ -37,6 +37,8 @@ const Research = () => {
     const location = useLocation();
     const [promotingAdId, setPromotingAdId] = useState(null);
     const [promotedAdIds, setPromotedAdIds] = useState(new Set());
+    const [adPendingDelete, setAdPendingDelete] = useState(null);
+    const [deletingAdId, setDeletingAdId] = useState(null);
     const [query, setQuery] = useState('');
     const [source, setSource] = useState('facebook');
     const [country, setCountry] = useState('US');
@@ -168,6 +170,37 @@ const Research = () => {
             showError(error.message || 'Failed to mark ad as winner');
         } finally {
             setPromotingAdId(null);
+        }
+    };
+
+    const handleDeleteAdClick = (ad, pageId) => {
+        setAdPendingDelete({ ad, pageId });
+    };
+
+    const confirmDeleteAd = async () => {
+        if (!adPendingDelete) return;
+        const { ad, pageId } = adPendingDelete;
+        setDeletingAdId(ad.id);
+        try {
+            const response = await authFetch(`${API_URL}/research/scraped-ads/${ad.id}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to remove ad');
+            }
+            setPageAds(prev => {
+                if (!pageId || !prev[pageId]) return prev;
+                return { ...prev, [pageId]: prev[pageId].filter(a => a.id !== ad.id) };
+            });
+            setSavedSearches(prev => prev.map(search => ({
+                ...search,
+                ads: (search.ads || []).filter(a => a.id !== ad.id)
+            })));
+            showSuccess('Ad removed');
+        } catch (error) {
+            showError(error.message || 'Failed to remove ad');
+        } finally {
+            setDeletingAdId(null);
+            setAdPendingDelete(null);
         }
     };
 
@@ -707,6 +740,14 @@ const Research = () => {
                                                                                     {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
                                                                                 </button>
                                                                             )}
+                                                                            <button
+                                                                                onClick={() => handleDeleteAdClick(ad, page.page_id)}
+                                                                                disabled={deletingAdId === ad.id}
+                                                                                className="px-2 py-1 bg-red-50 text-red-600 rounded font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                title="Remove this ad from the dashboard"
+                                                                            >
+                                                                                {deletingAdId === ad.id ? 'Removing...' : '🗑 Remove'}
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1111,6 +1152,14 @@ const Research = () => {
                                                                                 {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
                                                                             </button>
                                                                         )}
+                                                                        <button
+                                                                            onClick={() => handleDeleteAdClick(ad, null)}
+                                                                            disabled={deletingAdId === ad.id}
+                                                                            className="text-red-600 hover:text-red-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                            title="Remove this ad from the dashboard"
+                                                                        >
+                                                                            {deletingAdId === ad.id ? 'Removing...' : '🗑 Remove'}
+                                                                        </button>
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -1165,6 +1214,42 @@ const Research = () => {
                                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
                             >
                                 Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Ad Confirmation Modal */}
+            {adPendingDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
+                                🗑
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Remove this ad?</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-6">
+                            {adPendingDelete.ad.headline || 'This ad'} will be permanently removed from your research dashboard. This can't be undone
+                            {adPendingDelete.ad && promotedAdIds.has(adPendingDelete.ad.id)
+                                ? ' — its Winning Ads blueprint will stay intact.'
+                                : '.'}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setAdPendingDelete(null)}
+                                disabled={deletingAdId === adPendingDelete.ad.id}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteAd}
+                                disabled={deletingAdId === adPendingDelete.ad.id}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deletingAdId === adPendingDelete.ad.id ? 'Removing...' : 'Remove'}
                             </button>
                         </div>
                     </div>

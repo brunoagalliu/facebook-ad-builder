@@ -333,6 +333,25 @@ router.post(
   })
 );
 
+// Individual-ad removal from the dashboard — distinct from deleteSavedSearch (wipes an
+// entire search's results) and page/keyword blacklisting (prevents future scrapes from
+// returning matches). This just clears specific already-scraped ads a user has judged
+// irrelevant/noise. Safe even for an already-promoted ad: WinningAd.sourceScrapedAdId
+// is onDelete: SetNull, so the blueprint survives, it just loses the back-reference.
+router.delete(
+  "/scraped-ads/:scrapedAdId",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    const ad = await prisma.scrapedAd.findUnique({ where: { id: req.params.scrapedAdId } });
+    if (!ad) {
+      res.status(404).json({ detail: "Scraped ad not found" });
+      return;
+    }
+    await prisma.scrapedAd.delete({ where: { id: req.params.scrapedAdId } });
+    res.json({ message: "Ad removed" });
+  })
+);
+
 router.get(
   "/verticals/:verticalId/aggregated-ads",
   asyncHandler(async (req, res) => {
