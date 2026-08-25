@@ -39,6 +39,8 @@ const Research = () => {
     const [promotedAdIds, setPromotedAdIds] = useState(new Set());
     const [adPendingDelete, setAdPendingDelete] = useState(null);
     const [deletingAdId, setDeletingAdId] = useState(null);
+    const [pagePendingDelete, setPagePendingDelete] = useState(null);
+    const [deletingPageId, setDeletingPageId] = useState(null);
     const [query, setQuery] = useState('');
     const [source, setSource] = useState('facebook');
     const [country, setCountry] = useState('US');
@@ -201,6 +203,39 @@ const Research = () => {
         } finally {
             setDeletingAdId(null);
             setAdPendingDelete(null);
+        }
+    };
+
+    const handleDeletePageClick = (page) => {
+        setPagePendingDelete(page);
+    };
+
+    const confirmDeletePage = async () => {
+        if (!pagePendingDelete || !selectedVertical) return;
+        const page = pagePendingDelete;
+        setDeletingPageId(page.page_id);
+        try {
+            const response = await authFetch(
+                `${API_URL}/research/verticals/${selectedVertical.id}/pages/${page.page_id}/ads`,
+                { method: 'DELETE' }
+            );
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to remove page');
+            }
+            const data = await response.json().catch(() => ({}));
+            setAggregatedAds(prev => prev.filter(p => p.page_id !== page.page_id));
+            setPageAds(prev => {
+                const next = { ...prev };
+                delete next[page.page_id];
+                return next;
+            });
+            showSuccess(data.message || 'Page removed');
+        } catch (error) {
+            showError(error.message || 'Failed to remove page');
+        } finally {
+            setDeletingPageId(null);
+            setPagePendingDelete(null);
         }
     };
 
@@ -647,12 +682,23 @@ const Research = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => handleAddToBlacklist(page.page_name)}
-                                                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-                                                >
-                                                    Block Page
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleAddToBlacklist(page.page_name)}
+                                                        className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                                        title="Excludes this page from future scrapes and hides it from view"
+                                                    >
+                                                        Block Page
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeletePageClick(page)}
+                                                        disabled={deletingPageId === page.page_id}
+                                                        className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title="Permanently deletes every scraped ad from this page in this vertical"
+                                                    >
+                                                        {deletingPageId === page.page_id ? 'Removing...' : '🗑 Delete All Ads'}
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* Expanded ads */}
@@ -1250,6 +1296,41 @@ const Research = () => {
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                             >
                                 {deletingAdId === adPendingDelete.ad.id ? 'Removing...' : 'Remove'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Page Ads Confirmation Modal */}
+            {pagePendingDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
+                                🗑
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Delete all ads from this page?</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-6">
+                            All {pagePendingDelete.total_ads} ad{pagePendingDelete.total_ads === 1 ? '' : 's'} scraped from <strong>{pagePendingDelete.page_name}</strong> in
+                            this vertical will be permanently removed from your research dashboard. This can't be undone — any already-promoted
+                            Winning Ads blueprints will stay intact. This doesn't stop future scrapes from returning this page again; use Block Page for that.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setPagePendingDelete(null)}
+                                disabled={deletingPageId === pagePendingDelete.page_id}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeletePage}
+                                disabled={deletingPageId === pagePendingDelete.page_id}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deletingPageId === pagePendingDelete.page_id ? 'Removing...' : 'Delete All Ads'}
                             </button>
                         </div>
                     </div>

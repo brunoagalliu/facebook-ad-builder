@@ -476,6 +476,30 @@ router.get(
   })
 );
 
+// Bulk version of the single-ad delete above — removes every scraped ad from one page,
+// scoped to the current vertical only (a FacebookPage isn't vertical-specific, and
+// nuking its ads across every vertical it happens to appear in would be a surprising
+// side effect of a button clicked from inside one vertical's view). Same onDelete:
+// SetNull safety for already-promoted ads as the single-ad route.
+router.delete(
+  "/verticals/:verticalId/pages/:pageId/ads",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    const { verticalId, pageId } = req.params;
+    const searches = await prisma.savedSearch.findMany({ where: { verticalId } });
+    const searchIds = searches.map((s) => s.id);
+    if (searchIds.length === 0) {
+      res.json({ message: "Removed 0 ads", count: 0 });
+      return;
+    }
+
+    const { count } = await prisma.scrapedAd.deleteMany({
+      where: { facebookPageId: pageId, searchId: { in: searchIds } },
+    });
+    res.json({ message: `Removed ${count} ad${count === 1 ? "" : "s"}`, count });
+  })
+);
+
 // ============= Brand Scrape Endpoints =============
 
 router.post(
