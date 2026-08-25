@@ -291,19 +291,35 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
  * rate may be lower than the full Playwright scrape below since Facebook's snapshot
  * pages are JS-heavy, but this was already the existing fallback for that same reason
  * when Playwright's network-interception doesn't capture an ad's images. */
+// Facebook's ad-snapshot ("render_ad") page is publicly viewable without login (that's
+// the whole point of the Ad Library's transparency feature) but is client-side rendered
+// — confirmed live that a plain fetch() gets a UIPage_LoggedOut shell with zero image
+// URLs anywhere in the initial HTML, while a real browser (no login needed) renders the
+// actual scontent/fbcdn creative URL after JS runs. A bare fetch()+regex can never see
+// this content; needs a real (headless is fine) browser.
 export async function extractMediaFromSnapshot(snapshotUrl: string): Promise<string[]> {
   const mediaUrls: string[] = [];
+  const browser = await chromium.launch({ headless: true });
   try {
-    const response = await fetch(snapshotUrl, { redirect: "follow" });
-    const html = await response.text();
+    const context = await browser.newContext({ userAgent: USER_AGENT });
+    const page = await context.newPage();
+    await page.goto(snapshotUrl, { timeout: 30_000, waitUntil: "networkidle" });
 
-    const imgMatches = html.match(/https:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*/gi) ?? [];
-    mediaUrls.push(...imgMatches.filter((url) => url.includes("scontent")).slice(0, 5));
+    const urls = await page.evaluate(() => {
+      const imgSrcs = Array.from(document.querySelectorAll("img")).map((img) => img.src);
+      const videoSrcs = Array.from(document.querySelectorAll("video, source")).map(
+        (el) => (el as HTMLVideoElement | HTMLSourceElement).src
+      );
+      return [...imgSrcs, ...videoSrcs].filter(Boolean);
+    });
 
-    const videoMatches = html.match(/https:\/\/[^"']+\.(?:mp4|webm)[^"']*/gi) ?? [];
-    mediaUrls.push(...videoMatches.slice(0, 3));
+    const images = urls.filter((url) => /\.(jpg|jpeg|png|webp)/i.test(url) && url.includes("scontent"));
+    const videos = urls.filter((url) => /\.(mp4|webm)/i.test(url));
+    mediaUrls.push(...images.slice(0, 5), ...videos.slice(0, 3));
   } catch (err) {
     console.error("Error extracting media from snapshot:", err);
+  } finally {
+    await browser.close();
   }
   return mediaUrls;
 }
