@@ -1,8 +1,17 @@
 /**
  * Ports the image-generation logic from backend/app/api/v1/generated_ads.py:
- * build_comprehensive_prompt, download_and_save_image, and the Fal.ai model-selection
- * branching in generate_image (with a mock/placeholder fallback when Fal isn't configured
- * or a generation call fails).
+ * build_comprehensive_prompt, download_and_save_image, and the model-selection
+ * branching in generate_image (with a mock/placeholder fallback when neither provider
+ * is configured or a generation call fails).
+ *
+ * nano-banana-pro (the default model) generates via Kie.ai's jobs API rather than
+ * Fal.ai — same createTask/recordInfo pattern videoGenerationService.ts already uses
+ * for Seedance, confirmed against kie.ai's own Nano Banana Pro API reference — because
+ * it's 40-60% cheaper for an identical model (Kie's own pricing table cites Fal as the
+ * reference price it's undercutting) and covers text-to-image and image-to-image/edit
+ * through the same endpoint (image_input populated vs. empty), unlike Fal's separate
+ * nano-banana-pro/edit SKU. Fal.ai stays wired up for the "imagen4" option (Kie parity
+ * unverified) and as an automatic fallback if KIE_AI_API_KEY isn't configured.
  */
 import { fal } from "@fal-ai/client";
 import { randomUUID } from "crypto";
@@ -10,6 +19,80 @@ import { randomUUID } from "crypto";
 import { settings } from "../core/config";
 import { ImageGenerationRequestInput } from "../schemas/generatedAd";
 import { uploadToLocal } from "./storage";
+
+const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
+const KIE_POLL_INTERVAL_MS = 3000;
+const KIE_POLL_TIMEOUT_MS = 120_000;
+const KIE_ASPECT_RATIOS = new Set(["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9", "auto"]);
+
+interface KieCreateTaskResponse {
+  code: number;
+  msg: string;
+  data?: { taskId: string };
+}
+
+interface KieRecordInfoResponse {
+  code: number;
+  msg: string;
+  data?: {
+    state: "waiting" | "queuing" | "generating" | "success" | "fail";
+    resultJson?: string;
+    failMsg?: string;
+  };
+}
+
+/** Runs one nano-banana-pro generation to completion via Kie.ai and returns the
+ * (ephemeral, ~24h) result URL — caller downloads it immediately, same as the Fal.ai
+ * path and videoGenerationService.ts's downloadAndSaveVideo. */
+async function generateViaKie(prompt: string, aspectRatio: string, resolution: string, imageInput: string[]): Promise<string> {
+  const response = await fetch(`${KIE_BASE_URL}/createTask`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.KIE_AI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "nano-banana-pro",
+      input: {
+        prompt,
+        image_input: imageInput,
+        aspect_ratio: KIE_ASPECT_RATIOS.has(aspectRatio) ? aspectRatio : "1:1",
+        resolution: ["1K", "2K", "4K"].includes(resolution) ? resolution : "1K",
+        output_format: "png",
+      },
+    }),
+  });
+  const data = (await response.json()) as KieCreateTaskResponse;
+  if (!response.ok || data.code !== 200 || !data.data?.taskId) {
+    throw new Error(data.msg || `Kie.ai createTask failed with status ${response.status}`);
+  }
+
+  const taskId = data.data.taskId;
+  const deadline = Date.now() + KIE_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, KIE_POLL_INTERVAL_MS));
+
+    const statusResponse = await fetch(`${KIE_BASE_URL}/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
+      headers: { Authorization: `Bearer ${settings.KIE_AI_API_KEY}` },
+    });
+    const statusData = (await statusResponse.json()) as KieRecordInfoResponse;
+    if (!statusResponse.ok || statusData.code !== 200 || !statusData.data) {
+      throw new Error(statusData.msg || `Kie.ai recordInfo failed with status ${statusResponse.status}`);
+    }
+
+    const { state, resultJson, failMsg } = statusData.data;
+    if (state === "success" && resultJson) {
+      const parsed = JSON.parse(resultJson) as { resultUrls?: string[] };
+      const resultUrl = parsed.resultUrls?.[0];
+      if (!resultUrl) throw new Error("Kie.ai task succeeded but returned no result URL");
+      return resultUrl;
+    }
+    if (state === "fail") {
+      throw new Error(failMsg || "Kie.ai image generation failed");
+    }
+  }
+  throw new Error("Kie.ai image generation timed out");
+}
 
 // Distilled from a course on AI UGC ad production — see
 // knowledge/direct_response/21_hook_iteration_from_reference.md and
@@ -121,6 +204,7 @@ function extractFalErrorMessage(err: unknown): string {
 
 export async function generateImages(request: ImageGenerationRequestInput): Promise<GeneratedImage[]> {
   const images: GeneratedImage[] = [];
+  const useKie = Boolean(settings.KIE_AI_API_KEY) && request.model !== "imagen4";
   const useFal = Boolean(settings.FAL_AI_API_KEY);
 
   if (useFal) {
@@ -132,19 +216,36 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
       const width = (size.width as number) ?? 1080;
       const height = (size.height as number) ?? 1080;
       const sizeName = (size.name as string) ?? "Square";
+      const aspectRatio = (size.aspectRatio as string) ?? "1:1";
 
       const prompt = buildComprehensivePrompt(request);
+      const imageInput = request.useProductImage && request.productShots.length > 0 ? request.productShots : [];
 
-      if (useFal) {
+      if (useKie) {
+        try {
+          const externalUrl = await generateViaKie(prompt, aspectRatio, request.resolution, imageInput);
+          const imageUrl = await downloadAndSaveImage(externalUrl, "generated");
+          images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
+        } catch (err) {
+          console.error("Kie.ai generation failed:", err);
+          images.push({
+            url: "",
+            size: sizeName,
+            dimensions: `${width}x${height}`,
+            prompt,
+            error: err instanceof Error ? err.message : "Image generation failed",
+          });
+        }
+      } else if (useFal) {
         try {
           let modelId: string;
           let args: Record<string, unknown>;
 
-          if (request.useProductImage && request.productShots.length > 0) {
+          if (imageInput.length > 0) {
             modelId = "fal-ai/nano-banana-pro/edit";
             args = {
               prompt,
-              image_urls: request.productShots,
+              image_urls: imageInput,
               aspect_ratio: `${width}:${height}`,
               output_format: "png",
             };
