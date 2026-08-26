@@ -294,6 +294,33 @@ export default function ImageAds() {
                 <p className="text-gray-600 mt-1">Generate AI-powered ads using winning templates</p>
             </div>
 
+            {/* Skip straight to Review once there's a real winning ad to generate from —
+                bypasses Template/Variations/Size/Campaign entirely instead of requiring a
+                click through each one when nothing in them needs customizing. */}
+            {wizardData.brand && wizardData.product && wizardData.profile && autoSuggestedTemplate && currentStep < 8 && (
+                <div className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                        {autoSuggestedTemplate.image_url && (
+                            <img src={autoSuggestedTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                        )}
+                        <div>
+                            <p className="font-medium text-gray-900">Ready to generate from {autoSuggestedTemplate.name}</p>
+                            <p className="text-sm text-gray-600">Skip Template, Variations, Size, and Campaign Details — all pulled from this winning ad.</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            updateData('template', autoSuggestedTemplate);
+                            setCurrentStep(8);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium whitespace-nowrap"
+                    >
+                        ⚡ Skip to Review
+                    </button>
+                </div>
+            )}
+
             {/* Progress Steps */}
             <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between relative">

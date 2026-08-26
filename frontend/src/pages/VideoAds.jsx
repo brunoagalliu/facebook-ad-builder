@@ -273,6 +273,31 @@ export default function VideoAds() {
                 <p className="text-gray-600 mt-1">Generate AI UGC-style video ads from your product assets</p>
             </div>
 
+            {/* Skip straight to Generate once there's a real winning ad's hook line to
+                use — bypasses Video Style entirely instead of requiring a click through
+                Character/Setting/Script when nothing in them needs customizing. */}
+            {wizardData.brand && wizardData.product && wizardData.profile
+                && autoVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 5 && (
+                <div className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                        {autoVideoTemplate.image_url && (
+                            <img src={autoVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                        )}
+                        <div>
+                            <p className="font-medium text-gray-900">Ready to generate from {autoVideoTemplate.name}</p>
+                            <p className="text-sm text-gray-600">Skip Video Style — hook line and pacing pulled from this winning ad.</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCurrentStep(5)}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium whitespace-nowrap"
+                    >
+                        ⚡ Skip to Generate
+                    </button>
+                </div>
+            )}
+
             {/* Progress Steps */}
             <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between relative">
