@@ -170,13 +170,32 @@ const WinningAds = () => {
                         </div>
                         <div className="p-6">
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* Left Column - Image */}
+                                {/* Left Column - Image/Video */}
                                 <div>
-                                    <img
-                                        src={selectedTemplate.image_url}
-                                        alt={selectedTemplate.name}
-                                        className="w-full rounded-lg shadow-md mb-4"
-                                    />
+                                    {selectedTemplate.media_type === 'video' && selectedTemplate.video_url ? (
+                                        <div className="mb-4">
+                                            <video
+                                                src={selectedTemplate.video_url}
+                                                controls
+                                                className="w-full rounded-lg shadow-md"
+                                            />
+                                            <a
+                                                href={selectedTemplate.video_url}
+                                                download
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-2 inline-flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 font-medium"
+                                            >
+                                                Download video
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={selectedTemplate.image_url}
+                                            alt={selectedTemplate.name}
+                                            className="w-full rounded-lg shadow-md mb-4"
+                                        />
+                                    )}
 
                                     {/* Quick Info */}
                                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -221,6 +240,83 @@ const WinningAds = () => {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Ad Copy Breakdown - the ad's actual original text, distinct from the AI's structural analysis below */}
+                                    {(selectedTemplate.headline || selectedTemplate.body_text || selectedTemplate.cta_text) && (
+                                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 space-y-3">
+                                            <h3 className="font-semibold text-purple-900 mb-1">Ad Copy</h3>
+                                            {selectedTemplate.headline && (
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">Headline</span>
+                                                        <CopyButton text={selectedTemplate.headline} label="Headline" />
+                                                    </div>
+                                                    <p className="text-sm text-gray-800">{selectedTemplate.headline}</p>
+                                                </div>
+                                            )}
+                                            {selectedTemplate.body_text && (
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">Primary Text</span>
+                                                        <CopyButton text={selectedTemplate.body_text} label="Primary Text" />
+                                                    </div>
+                                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedTemplate.body_text}</p>
+                                                </div>
+                                            )}
+                                            {selectedTemplate.cta_text && (
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">CTA</span>
+                                                        <CopyButton text={selectedTemplate.cta_text} label="CTA" />
+                                                    </div>
+                                                    <p className="text-sm text-gray-800">{selectedTemplate.cta_text}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Video Blueprint (Gemini video-understanding breakdown) */}
+                                    {selectedTemplate.video_blueprint_json && (() => {
+                                        const vb = selectedTemplate.video_blueprint_json;
+                                        return (
+                                            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200 space-y-3">
+                                                <h3 className="font-semibold text-indigo-900 mb-1">Video Blueprint</h3>
+                                                {vb.hook_transcript && (
+                                                    <AnalysisField label="Hook Transcript" value={vb.hook_transcript} fullWidth />
+                                                )}
+                                                {vb.hook_type && <AnalysisField label="Hook Type" value={vb.hook_type} fullWidth />}
+                                                {vb.narrative_arc && <AnalysisField label="Narrative Arc" value={vb.narrative_arc} fullWidth />}
+                                                {vb.pacing_and_cuts && <AnalysisField label="Pacing & Cuts" value={vb.pacing_and_cuts} fullWidth />}
+                                                {vb.cinematography_style && (
+                                                    <AnalysisField label="Cinematography Style" value={vb.cinematography_style} fullWidth />
+                                                )}
+                                                {vb.dialogue_style && <AnalysisField label="Dialogue Style" value={vb.dialogue_style} fullWidth />}
+                                                {vb.psychological_triggers?.length > 0 && (
+                                                    <AnalysisField label="Psychological Triggers" value={vb.psychological_triggers.join(', ')} fullWidth />
+                                                )}
+                                                {vb.authenticity_signals?.length > 0 && (
+                                                    <AnalysisField label="Authenticity Signals" value={vb.authenticity_signals.join(', ')} fullWidth />
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Image Blueprint (adRemixService's deconstruction breakdown) */}
+                                    {selectedTemplate.blueprint_json && (() => {
+                                        const bp = selectedTemplate.blueprint_json;
+                                        return (
+                                            <div className="bg-amber-50 rounded-lg p-4 border border-amber-200 space-y-3">
+                                                <h3 className="font-semibold text-amber-900 mb-1">Image Blueprint</h3>
+                                                {bp.layout_framework && <AnalysisField label="Layout Framework" value={bp.layout_framework} fullWidth />}
+                                                {bp.narrative_arc && <AnalysisField label="Narrative Arc" value={bp.narrative_arc} fullWidth />}
+                                                {bp.text_hierarchy && <AnalysisField label="Text Hierarchy" value={bp.text_hierarchy} fullWidth />}
+                                                {bp.visual_style_guide && <AnalysisField label="Visual Style Guide" value={bp.visual_style_guide} fullWidth />}
+                                                {bp.psychological_triggers?.length > 0 && (
+                                                    <AnalysisField label="Psychological Triggers" value={bp.psychological_triggers.join(', ')} fullWidth />
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* Analysis Fields Grid */}
                                     <div className="grid grid-cols-1 gap-4">

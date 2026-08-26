@@ -194,6 +194,13 @@ model WinningAd {
   imageUrl              String    @map("image_url")
   notes                 String?
   tags                  String?
+  // The scraped ad's raw copy elements, carried over as-is at promotion time
+  // (winnerPromotionService.ts) — distinct from blueprintJson/videoBlueprintJson's
+  // AI-derived structural analysis, which never preserved the actual original text a
+  // user would want to reference/reuse (exact headline, exact body copy, exact CTA).
+  headline              String?
+  bodyText              String?   @map("body_text")
+  ctaText               String?   @map("cta_text")
   analysis              String?
   recreationPrompt      String?   @map("recreation_prompt")
   topic                 String?

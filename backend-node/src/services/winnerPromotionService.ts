@@ -96,6 +96,9 @@ export async function promoteScrapedAd(
     data: {
       name: `${ad.brandName ?? "Unknown"} — ${ad.headline ?? "Untitled"}`.slice(0, 200),
       imageUrl: uploadedImageUrl,
+      headline: ad.headline,
+      bodyText: ad.adCopy,
+      ctaText: ad.ctaText,
       mediaType: videoUrl ? "video" : "image",
       templateCategory: source === "auto" ? "Auto-promoted" : "Manually promoted",
       productName: ad.brandName,
