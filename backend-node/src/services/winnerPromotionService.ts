@@ -70,7 +70,7 @@ export async function promoteScrapedAd(
 ): Promise<PromotionResult["promoted"][number]> {
   const ad = await prisma.scrapedAd.findUnique({
     where: { id: scrapedAdId },
-    include: { winningAd: true, savedSearch: true },
+    include: { winningAd: true, savedSearch: { include: { vertical: true } } },
   });
   if (!ad) throw new Error("Scraped ad not found");
   if (ad.winningAd) throw new Error("This ad has already been promoted to a winning ad");
@@ -105,6 +105,12 @@ export async function promoteScrapedAd(
       bodyText: ad.adCopy,
       ctaText: ad.ctaText,
       mediaType: videoSrc ? "video" : "image",
+      // category is the vertical/niche this ad was scraped under (e.g. "Debt relief")
+      // — templateCategory is a different, pre-existing field describing *how* the
+      // template was promoted ("Auto-promoted"/"Manually promoted"/"Uploaded"), not
+      // what niche it's from. The vertical link (verticalId) already existed on this
+      // model but was never surfaced as a readable label anywhere.
+      category: ad.savedSearch?.vertical?.name ?? null,
       templateCategory: source === "auto" ? "Auto-promoted" : "Manually promoted",
       productName: ad.brandName,
       notes,

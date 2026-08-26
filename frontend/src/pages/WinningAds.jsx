@@ -202,9 +202,15 @@ const WinningAds = () => {
                                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                         <h3 className="font-semibold text-gray-900 mb-3">Quick Info</h3>
                                         <div className="space-y-2 text-sm">
+                                            {selectedTemplate.category && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Vertical</span>
+                                                    <span className="text-gray-900 font-medium">{selectedTemplate.category}</span>
+                                                </div>
+                                            )}
                                             {selectedTemplate.template_category && (
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Category</span>
+                                                    <span className="text-gray-500">Type</span>
                                                     <span className="text-gray-900 font-medium capitalize">{selectedTemplate.template_category}</span>
                                                 </div>
                                             )}

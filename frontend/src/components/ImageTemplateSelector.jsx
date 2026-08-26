@@ -401,6 +401,12 @@ function TemplateCard({ template, onSelect, isSelected, onToggleSelect }) {
                 <div className="p-4">
                     <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">{template.name}</h3>
 
+                    {template.category && (
+                        <span className="inline-block bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium mb-2">
+                            {template.category}
+                        </span>
+                    )}
+
                     {template.design_style && (
                         <p className="text-xs text-gray-500 mb-3">{template.design_style}</p>
                     )}
@@ -470,11 +476,18 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
                 <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                         <h3 className="font-semibold text-gray-900 text-lg">{template.name}</h3>
-                        {template.template_category && (
-                            <span className="bg-purple-100 text-purple-700 text-xs px-3 py-1 rounded-full font-medium capitalize">
-                                {template.template_category}
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {template.category && (
+                                <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-medium">
+                                    {template.category}
+                                </span>
+                            )}
+                            {template.template_category && (
+                                <span className="bg-purple-100 text-purple-700 text-xs px-3 py-1 rounded-full font-medium capitalize">
+                                    {template.template_category}
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
