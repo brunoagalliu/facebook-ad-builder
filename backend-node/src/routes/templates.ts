@@ -137,4 +137,18 @@ router.post(
   })
 );
 
+router.post(
+  "/bulk-delete",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    const ids = (req.body?.ids ?? []) as string[];
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ detail: "No template IDs provided" });
+      return;
+    }
+    const { count } = await prisma.winningAd.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `Deleted ${count} template${count === 1 ? "" : "s"}`, count });
+  })
+);
+
 export default router;

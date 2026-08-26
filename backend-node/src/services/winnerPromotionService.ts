@@ -116,11 +116,17 @@ export async function promoteScrapedAd(
   // pools instead of one media type silently winning exclusive ownership of the ad.
   try {
     if (videoSrc) {
+      // Persisted as soon as the upload succeeds, separately from the blueprint update
+      // below — a slow or failing Gemini call shouldn't lose a video that's already
+      // sitting in R2 (confirmed live: this was happening, leaving video_url null even
+      // though the actual file uploaded fine).
       const uploadedVideoUrl = await downloadAndUploadVideo(videoSrc, ad.id);
+      await prisma.winningAd.update({ where: { id: winningAd.id }, data: { videoUrl: uploadedVideoUrl } });
+
       const videoBlueprint = await deconstructVideoTemplate(uploadedVideoUrl);
       await prisma.winningAd.update({
         where: { id: winningAd.id },
-        data: { videoUrl: uploadedVideoUrl, videoBlueprintJson: videoBlueprint, blueprintAnalyzedAt: new Date() },
+        data: { videoBlueprintJson: videoBlueprint, blueprintAnalyzedAt: new Date() },
       });
     }
     if (realImageSrc) {
