@@ -92,7 +92,13 @@ export default function VideoAds() {
             case 1: return wizardData.brand !== null;
             case 2: return wizardData.product !== null;
             case 3: return wizardData.profile !== null;
-            case 4: return scenes.every(s => s.action.trim().length > 0);
+            // Scene 1 can stay blank if a winning ad's hook_transcript is available to
+            // fall back on at generate time (see handleGenerate) — any additional
+            // scenes beyond the first still need real content, since there's no
+            // per-scene blueprint data to substitute for those.
+            case 4: return scenes.every((s, i) =>
+                s.action.trim().length > 0 || (i === 0 && Boolean(autoVideoTemplate?.video_blueprint_json?.hook_transcript))
+            );
             default: return true;
         }
     };
@@ -176,6 +182,17 @@ export default function VideoAds() {
         setGenerationState('waiting');
         pollAbortRef.current = false;
 
+        // Mirrors isStepComplete's fallback: a blank Scene 1 is only allowed through
+        // when a winning ad's hook_transcript exists, so substitute it here — the
+        // backend's schema requires real, non-empty scene text (min(1)), it can't stay
+        // blank on the wire even though the wizard let the user skip typing it.
+        const scenesToSend = scenes.map((s, i) => {
+            if (i === 0 && !s.action.trim() && autoVideoTemplate?.video_blueprint_json?.hook_transcript) {
+                return { ...s, action: autoVideoTemplate.video_blueprint_json.hook_transcript };
+            }
+            return s;
+        });
+
         try {
             const response = await authFetch(`${API_URL}/generated-ads/generate-video`, {
                 method: 'POST',
@@ -192,7 +209,7 @@ export default function VideoAds() {
                         description: character.description || undefined,
                     },
                     location: location || undefined,
-                    scenes,
+                    scenes: scenesToSend,
                     aspectRatio,
                 })
             });
@@ -413,7 +430,10 @@ export default function VideoAds() {
                                     </button>
                                 </div>
                             </div>
-                            <p className="text-sm text-gray-500 mb-1">Up to 3 scenes, {MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.</p>
+                            <p className="text-sm text-gray-500 mb-1">
+                                Up to 3 scenes, {MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.
+                                {autoVideoTemplate?.video_blueprint_json?.hook_transcript && ' Scene 1 can stay blank to use the winning ad\'s own hook line directly.'}
+                            </p>
                             <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-gray-400'}`}>
                                 {totalDuration}s / {MAX_TOTAL_DURATION}s{totalDuration > MAX_TOTAL_DURATION ? ' — will be trimmed to fit' : ''}
                             </p>
@@ -440,7 +460,11 @@ export default function VideoAds() {
                                         <textarea
                                             value={scene.action}
                                             onChange={(e) => updateScene(i, 'action', e.target.value)}
-                                            placeholder='e.g. She holds up the product, smiling: "Okay, so this might sound crazy, but I swear this actually worked."'
+                                            placeholder={
+                                                i === 0 && autoVideoTemplate?.video_blueprint_json?.hook_transcript
+                                                    ? "Leave blank to use the winning ad's own hook line"
+                                                    : 'e.g. She holds up the product, smiling: "Okay, so this might sound crazy, but I swear this actually worked."'
+                                            }
                                             rows={2}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
                                         />

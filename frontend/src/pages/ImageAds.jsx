@@ -123,7 +123,13 @@ export default function ImageAds() {
             case 4: return wizardData.template !== null;
             case 5: return wizardData.variationCount >= 1 && wizardData.variationCount <= 10;
             case 6: return wizardData.imageSizes && wizardData.imageSizes.length > 0;
-            case 7: return wizardData.campaignDetails.offer && wizardData.campaignDetails.messaging;
+            // Not required to type anything here if the selected Winning Ad already
+            // carries real copy (headline/body_text) — that's usable as a direct
+            // fallback in ReviewStep's buildPrompt() instead of forcing manual entry.
+            case 7: return Boolean(
+                (wizardData.campaignDetails.offer && wizardData.campaignDetails.messaging) ||
+                (wizardData.template?.headline && wizardData.template?.body_text)
+            );
             default: return true;
         }
     };
@@ -851,7 +857,11 @@ function CampaignDetailsStep({ details, onChange, template }) {
             <div className="flex items-start justify-between mb-4">
                 <div>
                     <h3 className="text-xl font-bold">Campaign Details</h3>
-                    <p className="text-gray-600 mt-1">Provide details to customize your ad copy</p>
+                    <p className="text-gray-600 mt-1">
+                        {canFillFromTemplate
+                            ? "Optional — leave blank to generate directly from the Winning Ad's own copy, or customize it below."
+                            : "Provide details to customize your ad copy"}
+                    </p>
                 </div>
                 {canFillFromTemplate && (
                     <button
@@ -868,14 +878,14 @@ function CampaignDetailsStep({ details, onChange, template }) {
             <div className="max-w-2xl space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Offer / Promotion *
+                        Offer / Promotion {!canFillFromTemplate && '*'}
                     </label>
                     <input
                         ref={offerInputRef}
                         type="text"
                         value={details.offer}
                         onChange={(e) => onChange('offer', e.target.value)}
-                        placeholder="e.g., 50% off Black Friday, Buy 2 Get 1 Free"
+                        placeholder={canFillFromTemplate ? "Leave blank to use the Winning Ad's headline" : "e.g., 50% off Black Friday, Buy 2 Get 1 Free"}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
@@ -895,12 +905,12 @@ function CampaignDetailsStep({ details, onChange, template }) {
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Key Messaging *
+                        Key Messaging {!canFillFromTemplate && '*'}
                     </label>
                     <textarea
                         value={details.messaging}
                         onChange={(e) => onChange('messaging', e.target.value)}
-                        placeholder="e.g., Science-backed results, Trusted by 10,000+ customers, Clinically proven"
+                        placeholder={canFillFromTemplate ? "Leave blank to use the Winning Ad's own copy" : "e.g., Science-backed results, Trusted by 10,000+ customers, Clinically proven"}
                         rows={3}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
@@ -946,9 +956,9 @@ TARGET AUDIENCE:
 - Goals: ${wizardData.profile?.goals || 'Desired outcomes'}
 
 CAMPAIGN DETAILS:
-- Offer: ${wizardData.campaignDetails.offer}
+- Offer: ${wizardData.campaignDetails.offer || wizardData.template?.headline || ''}
 ${wizardData.campaignDetails.urgency ? `- Urgency: ${wizardData.campaignDetails.urgency}` : ''}
-- Key Messaging: ${wizardData.campaignDetails.messaging}
+- Key Messaging: ${wizardData.campaignDetails.messaging || wizardData.template?.body_text || ''}
 
 BODY COPY STYLES (vary across variations):
 1. BULLET POINTS WITH EMOJIS: Use 2-4 bullet points with emojis at the start
@@ -1032,12 +1042,12 @@ Return ONLY valid JSON in this exact format:
                 />
                 <ReviewItem
                     label="Offer"
-                    value={wizardData.campaignDetails.offer}
+                    value={wizardData.campaignDetails.offer || wizardData.template?.headline}
                     icon={FileText}
                 />
                 <ReviewItem
                     label="Messaging"
-                    value={wizardData.campaignDetails.messaging}
+                    value={wizardData.campaignDetails.messaging || wizardData.template?.body_text}
                     icon={FileText}
                 />
             </div>
