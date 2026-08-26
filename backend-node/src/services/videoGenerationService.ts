@@ -130,6 +130,7 @@ export function buildVideoPrompt(
     cinematographyLine,
     inspirationParts.length ? `Creative Inspiration (from research on what's winning in this niche): ${inspirationParts.join("; ")}.` : "",
     `Actions:\n${actions}`,
+    "Pacing directive: The character begins speaking within the first second — no silent pause, no settling-in beat, no dead air before dialogue starts. Deliver every line at a natural, energetic conversational pace, not slow or deliberate — this is a fast-paced short-form hook, every second counts.",
     "Audio & Ambience: Crisp, clear voice with natural room tone. No music, no cuts; one continuous take.",
     `UGC Authenticity Keywords: ${authenticityKeywords}.`,
     `Universal Quality Control Negatives: ${QUALITY_CONTROL_NEGATIVES}.`,
