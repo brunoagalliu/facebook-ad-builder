@@ -57,11 +57,21 @@ router.get(
   "",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { search, category, style } = req.query as { search?: string; category?: string; style?: string };
+    const { search, category, style, vertical } = req.query as {
+      search?: string;
+      category?: string;
+      style?: string;
+      vertical?: string;
+    };
 
     const where: Record<string, unknown> = {};
     if (category) where.templateCategory = category;
     if (style) where.designStyle = style;
+    // Distinct from `category` above (that's templateCategory — Auto/Manually
+    // promoted/Uploaded, i.e. how a template was created) — `vertical` filters by the
+    // niche it was scraped under (WinningAd.category, e.g. "Debt relief"), populated at
+    // promotion time from the source scraped ad's search's vertical.
+    if (vertical) where.category = vertical;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -89,9 +99,15 @@ router.get(
       select: { designStyle: true },
       distinct: ["designStyle"],
     });
+    const verticals = await prisma.winningAd.findMany({
+      where: { category: { not: null } },
+      select: { category: true },
+      distinct: ["category"],
+    });
     res.json({
       categories: categories.map((c) => c.templateCategory),
       styles: styles.map((s) => s.designStyle),
+      verticals: verticals.map((v) => v.category),
     });
   })
 );

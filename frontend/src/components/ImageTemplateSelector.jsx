@@ -9,9 +9,10 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     const { showError } = useToast();
     const { authFetch } = useAuth();
     const [templates, setTemplates] = useState([]);
-    const [filters, setFilters] = useState({ categories: [], styles: [] });
+    const [filters, setFilters] = useState({ categories: [], styles: [], verticals: [] });
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedStyle, setSelectedStyle] = useState('');
+    const [selectedVertical, setSelectedVertical] = useState('');
     const [viewMode, setViewMode] = useState(localStorage.getItem('preferred_view_mode') || 'grid'); // 'grid' or 'list'
 
     // Persist view mode preference
@@ -32,7 +33,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     // Fetch templates when filters change
     useEffect(() => {
         fetchTemplates();
-    }, [selectedCategory, selectedStyle]);
+    }, [selectedCategory, selectedStyle, selectedVertical]);
 
     const fetchFilters = async () => {
         try {
@@ -52,6 +53,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
             const params = new URLSearchParams();
             if (selectedCategory) params.append('category', selectedCategory);
             if (selectedStyle) params.append('style', selectedStyle);
+            if (selectedVertical) params.append('vertical', selectedVertical);
 
             const response = await authFetch(`${API_URL}/templates/?${params}`);
             if (response.ok) {
@@ -87,6 +89,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     const clearFilters = () => {
         setSelectedCategory('');
         setSelectedStyle('');
+        setSelectedVertical('');
     };
 
     const sortTemplates = (templateList, sortOption) => {
@@ -208,6 +211,18 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                         <span className="text-sm font-medium text-gray-700">Filters:</span>
                     </div>
 
+                    {/* Vertical Filter */}
+                    <select
+                        value={selectedVertical}
+                        onChange={(e) => setSelectedVertical(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                        <option value="">All Verticals</option>
+                        {filters.verticals && filters.verticals.map(v => (
+                            <option key={v} value={v}>{v}</option>
+                        ))}
+                    </select>
+
                     {/* Category Filter */}
                     <select
                         value={selectedCategory}
@@ -243,7 +258,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                         <option value="name">Name (A-Z)</option>
                     </select>
 
-                    {(selectedCategory || selectedStyle) && (
+                    {(selectedCategory || selectedStyle || selectedVertical) && (
                         <button
                             onClick={clearFilters}
                             className="text-sm text-purple-600 hover:text-purple-700 font-medium"
