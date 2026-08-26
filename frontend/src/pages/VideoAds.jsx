@@ -69,10 +69,24 @@ export default function VideoAds() {
             .catch(() => setAutoVideoTemplate(null));
     }, [wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
 
-    const fillFromWinningAd = () => {
+    // hook_transcript is just the opening line of a longer source ad — feeding it as
+    // the *only* scene left the generated video with nothing to resolve into, trailing
+    // off with no payoff/CTA (confirmed live: a 10s video that just stops after the
+    // hook line). Building a real two-beat hook+CTA script instead of pasting an
+    // isolated sentence gives the model something to land on.
+    const buildScenesFromTemplate = () => {
         const hook = autoVideoTemplate?.video_blueprint_json?.hook_transcript;
-        if (!hook) return;
-        setScenes(prev => prev.map((s, i) => i === 0 ? { ...s, action: hook } : s));
+        if (!hook) return null;
+        const productName = wizardData.product?.name || wizardData.brand?.name || 'this';
+        return [
+            { durationSeconds: 10, action: hook },
+            { durationSeconds: 5, action: `She turns to the camera and says: "If that's you, ${productName} could help — tap below to see if you qualify."` },
+        ];
+    };
+
+    const fillFromWinningAd = () => {
+        const built = buildScenesFromTemplate();
+        if (built) setScenes(built);
     };
 
     const steps = [
@@ -290,7 +304,7 @@ export default function VideoAds() {
                     </div>
                     <button
                         type="button"
-                        onClick={() => setCurrentStep(5)}
+                        onClick={() => { fillFromWinningAd(); setCurrentStep(5); }}
                         className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium whitespace-nowrap"
                     >
                         ⚡ Skip to Generate
