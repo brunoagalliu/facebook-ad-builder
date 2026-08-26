@@ -112,9 +112,9 @@ const WinningAds = () => {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                         <Star size={32} className="text-amber-600" />
-                        Image Templates
+                        Winning Ads
                     </h1>
-                    <p className="text-gray-600 mt-1">Browse and manage your winning ad templates</p>
+                    <p className="text-gray-600 mt-1">Browse and manage your winning ad templates — image and video</p>
                 </div>
                 <button
                     onClick={() => fileInputRef.current?.click()}

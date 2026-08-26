@@ -55,10 +55,6 @@ async function downloadAndUploadVideo(videoUrl: string, scrapedAdId: string): Pr
   return uploadFile(buffer, filename, contentType);
 }
 
-function isVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov)(\?|$)/i.test(url);
-}
-
 /** Promotes one specific scraped ad into a WinningAd blueprint, regardless of its
  * run-duration score — used both by the manual "mark as winner" action and, in a
  * loop, by the automatic top-N promotion below. Throws (rather than returning a
@@ -77,20 +73,26 @@ export async function promoteScrapedAd(
   if (ad.winningAd) throw new Error("This ad has already been promoted to a winning ad");
   if (!ad.adSnapshotUrl) throw new Error("This ad has no snapshot available to extract media from");
 
-  // extractMediaFromSnapshot returns a mixed list (images first, then videos) — split
-  // by extension so a video ad gets video-blueprint treatment instead of being fed to
-  // Gemini's image deconstruction as if it were a photo.
-  const mediaUrls = await extractMediaFromSnapshot(ad.adSnapshotUrl);
-  const videoUrl = mediaUrls.find(isVideoUrl);
-  const imageUrl = mediaUrls.find((u) => !isVideoUrl(u));
-  if (!videoUrl && !imageUrl) throw new Error("No image or video found in ad snapshot");
+  const media = await extractMediaFromSnapshot(ad.adSnapshotUrl);
+  const videoSrc = media.videos[0];
+  // A genuine second creative version of the ad (Meta's "This ad has multiple
+  // versions") — deliberately distinct from media.videoPoster below, which is just a
+  // representative frame Facebook generates for the video player, not a real second
+  // version worth analyzing on its own.
+  const realImageSrc = media.images[0];
+  if (!videoSrc && !realImageSrc) throw new Error("No image or video found in ad snapshot");
 
   const runDurationDays = computeRunDurationDays(ad.startDate, ad.stopDate);
   const label = source === "auto" ? "Auto-promoted" : "Manually marked as a winner";
   const notes =
     runDurationDays !== null ? `${label} from research: running ${runDurationDays} days as of promotion.` : `${label} from research.`;
 
-  const uploadedImageUrl = imageUrl ? await downloadAndUploadImage(imageUrl, ad.id) : VIDEO_PLACEHOLDER_IMAGE_URL;
+  // Thumbnail preference: a real distinct creative image first, then the video's own
+  // poster frame (a genuine representative shot, not the page's tiny avatar — the
+  // original bug), only falling to a generic placeholder if truly nothing visual came
+  // back at all.
+  const thumbnailSrc = realImageSrc ?? media.videoPoster ?? undefined;
+  const uploadedImageUrl = thumbnailSrc ? await downloadAndUploadImage(thumbnailSrc, ad.id) : VIDEO_PLACEHOLDER_IMAGE_URL;
 
   const winningAd = await prisma.winningAd.create({
     data: {
@@ -99,7 +101,7 @@ export async function promoteScrapedAd(
       headline: ad.headline,
       bodyText: ad.adCopy,
       ctaText: ad.ctaText,
-      mediaType: videoUrl ? "video" : "image",
+      mediaType: videoSrc ? "video" : "image",
       templateCategory: source === "auto" ? "Auto-promoted" : "Manually promoted",
       productName: ad.brandName,
       notes,
@@ -109,19 +111,23 @@ export async function promoteScrapedAd(
     },
   });
 
+  // Both blueprint types run independently (not else-if) so an ad with a genuine
+  // second image version contributes to both the image- and video-generation blueprint
+  // pools instead of one media type silently winning exclusive ownership of the ad.
   try {
-    if (videoUrl) {
-      const uploadedVideoUrl = await downloadAndUploadVideo(videoUrl, ad.id);
-      const blueprint = await deconstructVideoTemplate(uploadedVideoUrl);
+    if (videoSrc) {
+      const uploadedVideoUrl = await downloadAndUploadVideo(videoSrc, ad.id);
+      const videoBlueprint = await deconstructVideoTemplate(uploadedVideoUrl);
       await prisma.winningAd.update({
         where: { id: winningAd.id },
-        data: { videoUrl: uploadedVideoUrl, videoBlueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
+        data: { videoUrl: uploadedVideoUrl, videoBlueprintJson: videoBlueprint, blueprintAnalyzedAt: new Date() },
       });
-    } else {
-      const blueprint = await deconstructTemplate(uploadedImageUrl);
+    }
+    if (realImageSrc) {
+      const imageBlueprint = await deconstructTemplate(uploadedImageUrl);
       await prisma.winningAd.update({
         where: { id: winningAd.id },
-        data: { blueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
+        data: { blueprintJson: imageBlueprint, blueprintAnalyzedAt: new Date() },
       });
     }
   } catch (err) {

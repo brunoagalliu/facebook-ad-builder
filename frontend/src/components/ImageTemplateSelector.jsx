@@ -385,6 +385,11 @@ function TemplateCard({ template, onSelect, isSelected, onToggleSelect }) {
                         alt={template.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
+                    {template.media_type === 'video' && (
+                        <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                            🎥 Video
+                        </div>
+                    )}
                     {template.template_category && (
                         <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full font-medium capitalize">
                             {template.template_category}
@@ -448,12 +453,17 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
 
             <div onClick={onSelect} className="flex-1 flex gap-4 cursor-pointer">
                 {/* Thumbnail */}
-                <div className="w-32 h-32 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                <div className="w-32 h-32 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
                     <img
                         src={template.image_url}
                         alt={template.name}
                         className="w-full h-full object-cover"
                     />
+                    {template.media_type === 'video' && (
+                        <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
+                            🎥
+                        </div>
+                    )}
                 </div>
 
                 {/* Info */}

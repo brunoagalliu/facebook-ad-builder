@@ -291,37 +291,58 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
  * rate may be lower than the full Playwright scrape below since Facebook's snapshot
  * pages are JS-heavy, but this was already the existing fallback for that same reason
  * when Playwright's network-interception doesn't capture an ad's images. */
+export interface SnapshotMedia {
+  // Genuine creative images only — e.g. a real second version of a video ad (Meta's "This
+  // ad has multiple versions"), or the sole image of a pure image ad. Excludes the page's
+  // own tiny avatar: confirmed live that a plain `img` query on a video ad's snapshot page
+  // returns exactly one <img>, a 60x60 page-profile picture, which isn't ad creative at all.
+  images: string[];
+  videos: string[];
+  // The <video> element's poster attribute — a real representative frame Facebook itself
+  // generates, confirmed present (a proper scontent image, not a generic gray box) even
+  // when no other image exists. Used as the WinningAd thumbnail for pure video ads instead
+  // of either a meaningless generic placeholder or (the original bug) the page avatar.
+  videoPoster: string | null;
+}
+
 // Facebook's ad-snapshot ("render_ad") page is publicly viewable without login (that's
 // the whole point of the Ad Library's transparency feature) but is client-side rendered
 // — confirmed live that a plain fetch() gets a UIPage_LoggedOut shell with zero image
 // URLs anywhere in the initial HTML, while a real browser (no login needed) renders the
 // actual scontent/fbcdn creative URL after JS runs. A bare fetch()+regex can never see
 // this content; needs a real (headless is fine) browser.
-export async function extractMediaFromSnapshot(snapshotUrl: string): Promise<string[]> {
-  const mediaUrls: string[] = [];
+const MIN_CREATIVE_IMAGE_DIMENSION = 200;
+
+export async function extractMediaFromSnapshot(snapshotUrl: string): Promise<SnapshotMedia> {
+  const result: SnapshotMedia = { images: [], videos: [], videoPoster: null };
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ userAgent: USER_AGENT });
     const page = await context.newPage();
     await page.goto(snapshotUrl, { timeout: 30_000, waitUntil: "networkidle" });
 
-    const urls = await page.evaluate(() => {
-      const imgSrcs = Array.from(document.querySelectorAll("img")).map((img) => img.src);
-      const videoSrcs = Array.from(document.querySelectorAll("video, source")).map(
-        (el) => (el as HTMLVideoElement | HTMLSourceElement).src
-      );
-      return [...imgSrcs, ...videoSrcs].filter(Boolean);
-    });
+    const extracted = await page.evaluate((minDim) => {
+      const imgSrcs = Array.from(document.querySelectorAll("img"))
+        .filter((img) => img.naturalWidth >= minDim || img.naturalHeight >= minDim)
+        .map((img) => img.src);
+      const videoEls = Array.from(document.querySelectorAll("video"));
+      const videoSrcs = [
+        ...videoEls.map((v) => v.src),
+        ...Array.from(document.querySelectorAll("video source")).map((s) => (s as HTMLSourceElement).src),
+      ];
+      const poster = videoEls.find((v) => v.poster)?.poster ?? null;
+      return { imgSrcs, videoSrcs: videoSrcs.filter(Boolean), poster };
+    }, MIN_CREATIVE_IMAGE_DIMENSION);
 
-    const images = urls.filter((url) => /\.(jpg|jpeg|png|webp)/i.test(url) && url.includes("scontent"));
-    const videos = urls.filter((url) => /\.(mp4|webm)/i.test(url));
-    mediaUrls.push(...images.slice(0, 5), ...videos.slice(0, 3));
+    result.images = extracted.imgSrcs.filter((url) => /\.(jpg|jpeg|png|webp)/i.test(url) && url.includes("scontent")).slice(0, 5);
+    result.videos = extracted.videoSrcs.filter((url) => /\.(mp4|webm)/i.test(url)).slice(0, 3);
+    result.videoPoster = extracted.poster;
   } catch (err) {
     console.error("Error extracting media from snapshot:", err);
   } finally {
     await browser.close();
   }
-  return mediaUrls;
+  return result;
 }
 
 function extensionAndTypeForUrl(mediaUrl: string): { ext: string; mediaType: "video" | "image" } {
@@ -385,7 +406,8 @@ async function processAd(adData: RawAd, brandScrapeId: string, folderName: strin
   } else {
     let urlList = adData._image_urls ?? [];
     if (urlList.length === 0 && adData.ad_snapshot_url) {
-      urlList = await extractMediaFromSnapshot(adData.ad_snapshot_url);
+      const media = await extractMediaFromSnapshot(adData.ad_snapshot_url);
+      urlList = [...media.images, ...media.videos];
     }
     originalMediaUrls = urlList.slice(0, 10);
 
