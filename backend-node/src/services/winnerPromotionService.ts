@@ -42,7 +42,10 @@ async function downloadAndUploadImage(imageUrl: string, scrapedAdId: string): Pr
   const buffer = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") ?? "image/jpeg";
   const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-  const filename = `winner_${scrapedAdId}_${randomUUID()}.${ext}`;
+  // Not "winner_" — confirmed live that ad-blocker extensions block requests to that
+  // filename pattern (net::ERR_BLOCKED_BY_CLIENT), almost certainly matching "winner"
+  // as a common scam/malvertising filter-list keyword.
+  const filename = `promoted-ad_${scrapedAdId}_${randomUUID()}.${ext}`;
   return uploadFile(buffer, filename, contentType);
 }
 
@@ -51,7 +54,7 @@ async function downloadAndUploadVideo(videoUrl: string, scrapedAdId: string): Pr
   if (!response.ok) throw new Error(`Failed to download video: ${response.status}`);
   const buffer = Buffer.from(await response.arrayBuffer());
   const contentType = response.headers.get("content-type") ?? "video/mp4";
-  const filename = `winner_${scrapedAdId}_${randomUUID()}.mp4`;
+  const filename = `promoted-ad_${scrapedAdId}_${randomUUID()}.mp4`;
   return uploadFile(buffer, filename, contentType);
 }
 
