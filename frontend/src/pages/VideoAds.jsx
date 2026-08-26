@@ -249,6 +249,15 @@ export default function VideoAds() {
                             productId: wizardData.product?.id,
                             mediaType: 'video',
                             videoUrl,
+                            // Video ads had no accompanying headline/body/CTA at all
+                            // before — the video is only the creative, not the whole ad,
+                            // so nothing showed in Generated Ads and it couldn't be
+                            // published as a real Facebook ad. Reuses the winning ad's
+                            // own real copy (already surfaced via the raw ad-copy
+                            // breakdown) rather than requiring a new manual step.
+                            headline: autoVideoTemplate?.headline || undefined,
+                            body: autoVideoTemplate?.body_text || undefined,
+                            cta: autoVideoTemplate?.cta_text || undefined,
                         }]
                     })
                 });
