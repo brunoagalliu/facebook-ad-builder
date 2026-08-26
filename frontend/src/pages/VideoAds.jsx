@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Video, Briefcase, Package, Users, Check, ChevronLeft, ChevronRight, Sparkles, Plus, Trash2, Download } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
@@ -49,6 +49,31 @@ export default function VideoAds() {
     const [generationState, setGenerationState] = useState(null); // 'waiting' | 'queuing' | 'generating' | 'success' | 'fail'
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState(null);
     const pollAbortRef = useRef(false);
+
+    // createVideoTask already auto-selects a video blueprint for the brand's vertical
+    // server-side (same rotating-pool logic ImageAds.jsx's auto-suggested template
+    // uses) to steer generation — this separately fetches that same pick just so the
+    // wizard can show it and let the user pull its hook line into the script, mirroring
+    // the image wizard's "Fill from Winning Ad" button.
+    const [autoVideoTemplate, setAutoVideoTemplate] = useState(null);
+    useEffect(() => {
+        const brandId = wizardData.brand?.id;
+        const verticalId = wizardData.brand?.verticalId;
+        if (!brandId || !verticalId) {
+            setAutoVideoTemplate(null);
+            return;
+        }
+        authFetch(`${API_URL}/generated-ads/auto-video-template?brand_id=${brandId}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(setAutoVideoTemplate)
+            .catch(() => setAutoVideoTemplate(null));
+    }, [wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
+
+    const fillFromWinningAd = () => {
+        const hook = autoVideoTemplate?.video_blueprint_json?.hook_transcript;
+        if (!hook) return;
+        setScenes(prev => prev.map((s, i) => i === 0 ? { ...s, action: hook } : s));
+    };
 
     const steps = [
         { id: 1, name: 'Brand', icon: Briefcase },
@@ -367,14 +392,26 @@ export default function VideoAds() {
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="text-lg font-bold text-gray-900">Script</h3>
-                                <button
-                                    type="button"
-                                    onClick={addScene}
-                                    disabled={scenes.length >= 3}
-                                    className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <Plus size={16} /> Add scene
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    {autoVideoTemplate?.video_blueprint_json?.hook_transcript && (
+                                        <button
+                                            type="button"
+                                            onClick={fillFromWinningAd}
+                                            className="flex items-center gap-1 text-sm px-3 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+                                            title="Fills Scene 1's action/dialogue with this vertical's winning ad's actual hook line"
+                                        >
+                                            ✨ Fill from Winning Ad
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={addScene}
+                                        disabled={scenes.length >= 3}
+                                        className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Plus size={16} /> Add scene
+                                    </button>
+                                </div>
                             </div>
                             <p className="text-sm text-gray-500 mb-1">Up to 3 scenes, {MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.</p>
                             <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-gray-400'}`}>

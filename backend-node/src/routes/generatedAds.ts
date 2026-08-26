@@ -7,7 +7,7 @@ import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
 import { videoGenerationRequestSchema } from "../schemas/videoGeneration";
-import { selectBlueprintForBrand } from "../services/blueprintSelectionService";
+import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
 import { generateImages } from "../services/imageGenerationService";
 import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
 import { serialize as serializeWinningAd } from "./templates";
@@ -45,6 +45,24 @@ router.get(
       return;
     }
     const blueprint = await selectBlueprintForBrand(brandId);
+    res.json(blueprint ? serializeWinningAd(blueprint) : null);
+  })
+);
+
+// Video counterpart of the above — createVideoTask already calls
+// selectVideoBlueprintForBrand internally to steer generation, but that pick was never
+// exposed to the frontend, so the wizard had no way to show or pull from it (unlike
+// the image wizard's auto-suggested template). Same "return null, not 404" contract.
+router.get(
+  "/auto-video-template",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const brandId = req.query.brand_id as string | undefined;
+    if (!brandId) {
+      res.status(422).json({ detail: "brand_id is required" });
+      return;
+    }
+    const blueprint = await selectVideoBlueprintForBrand(brandId);
     res.json(blueprint ? serializeWinningAd(blueprint) : null);
   })
 );
