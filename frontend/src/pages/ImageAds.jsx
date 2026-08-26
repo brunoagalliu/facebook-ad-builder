@@ -500,6 +500,7 @@ export default function ImageAds() {
                     <CampaignDetailsStep
                         details={wizardData.campaignDetails}
                         onChange={updateCampaignDetails}
+                        template={wizardData.template}
                     />
                 )}
 
@@ -819,7 +820,7 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
     );
 }
 
-function CampaignDetailsStep({ details, onChange }) {
+function CampaignDetailsStep({ details, onChange, template }) {
     const offerInputRef = React.useRef(null);
 
     React.useEffect(() => {
@@ -828,10 +829,41 @@ function CampaignDetailsStep({ details, onChange }) {
         }
     }, []);
 
+    // The selected Winning Ad already carries its own headline/body/CTA (the ad's real
+    // copy) plus an AI-derived blueprint (image: visual_style_guide; video:
+    // cinematography_style) — pulling from those instead of typing generic examples
+    // means the new ad's copy is grounded in something that's actually proven to work,
+    // not a guess. Explicit button rather than auto-filling on template selection so it
+    // never silently overwrites values already saved from a previous session
+    // (campaignDetails persists to localStorage).
+    const blueprint = template?.blueprint_json || template?.video_blueprint_json;
+    const canFillFromTemplate = Boolean(template?.headline || template?.body_text || blueprint);
+
+    const fillFromTemplate = () => {
+        if (template?.headline) onChange('offer', template.headline);
+        if (template?.body_text) onChange('messaging', template.body_text);
+        const angle = template?.blueprint_json?.visual_style_guide || template?.video_blueprint_json?.cinematography_style;
+        if (angle) onChange('angle', angle);
+    };
+
     return (
         <div>
-            <h3 className="text-xl font-bold mb-4">Campaign Details</h3>
-            <p className="text-gray-600 mb-6">Provide details to customize your ad copy</p>
+            <div className="flex items-start justify-between mb-4">
+                <div>
+                    <h3 className="text-xl font-bold">Campaign Details</h3>
+                    <p className="text-gray-600 mt-1">Provide details to customize your ad copy</p>
+                </div>
+                {canFillFromTemplate && (
+                    <button
+                        type="button"
+                        onClick={fillFromTemplate}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium text-sm whitespace-nowrap"
+                        title="Fills these fields from the selected Winning Ad's actual headline, copy, and visual style"
+                    >
+                        ✨ Fill from Winning Ad
+                    </button>
+                )}
+            </div>
 
             <div className="max-w-2xl space-y-4">
                 <div>
