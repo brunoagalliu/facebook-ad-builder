@@ -175,6 +175,7 @@ const WinningAds = () => {
                                     {selectedTemplate.media_type === 'video' && selectedTemplate.video_url ? (
                                         <div className="mb-4">
                                             <video
+                                                key={selectedTemplate.video_url}
                                                 src={selectedTemplate.video_url}
                                                 controls
                                                 className="w-full rounded-lg shadow-md"
