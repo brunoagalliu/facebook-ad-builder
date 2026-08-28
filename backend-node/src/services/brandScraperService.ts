@@ -115,14 +115,22 @@ async function fetchPageAds(pageId: string, brandName?: string, limit = 500): Pr
   return ads;
 }
 
-/** Facebook-login + network-response-interception Playwright scrape. This is the
- * highest-risk piece of the whole rewrite to actually run: it logs into a real Facebook
- * account via FB_SCRAPER_EMAIL/PASSWORD, which real Facebook can flag as suspicious
- * automation (checkpoints, temporary locks) if run often or from a new environment.
- * Ported faithfully, but treat live invocation with the same caution the Python app's
- * own comments imply — this was never a "safe to hammer" code path. */
+/** Facebook-login Playwright scrape. This is the highest-risk piece of the whole
+ * rewrite to actually run: it logs into a real Facebook account via
+ * FB_SCRAPER_EMAIL/PASSWORD, which real Facebook can flag as suspicious automation
+ * (checkpoints, temporary locks) if run often or from a new environment. Ported
+ * faithfully, but treat live invocation with the same caution the Python app's own
+ * comments imply — this was never a "safe to hammer" code path.
+ *
+ * Media extraction reads straight from the rendered DOM (img/video src, naturalWidth-
+ * filtered) rather than the network-response-interception + URL-matching this
+ * originally did — confirmed live that approach silently produced blank/wrong images:
+ * Facebook's CDN URLs carry expiring signed tokens that routinely differ between when a
+ * response is captured and when the DOM is later read, so most matches failed and ads
+ * fell back to getting an arbitrary captured image (or none) instead of their own. It
+ * also never captured video at all — the response listener only checked for an image
+ * content-type. Same DOM-read pattern already proven working in extractMediaFromSnapshot. */
 async function playwrightScrapeAds(query: string, limit: number, isSearch: boolean): Promise<RawAd[]> {
-  const capturedImages = new Map<string, Buffer>();
   const fbEmail = settings.FB_SCRAPER_EMAIL;
   const fbPassword = settings.FB_SCRAPER_PASSWORD;
 
@@ -130,19 +138,6 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
   try {
     const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, userAgent: USER_AGENT });
     const page = await context.newPage();
-
-    page.on("response", async (response) => {
-      const url = response.url();
-      const contentType = response.headers()["content-type"] ?? "";
-      if (contentType.includes("image") && (url.includes("scontent") || url.includes("fbcdn"))) {
-        try {
-          const body = await response.body();
-          if (body.length > 5000) capturedImages.set(url, body);
-        } catch {
-          // response body not available (e.g. redirected/aborted) — skip
-        }
-      }
-    });
 
     if (fbEmail && fbPassword) {
       console.log("Logging into Facebook...");
@@ -234,22 +229,43 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
           if (match) pageId = match[1];
         });
 
-        const imageUrls: string[] = [];
+        // naturalWidth/naturalHeight (the actual bitmap's real dimensions), not
+        // .width (rendered/CSS layout size, unreliable — 0 for a not-yet-laid-out or
+        // lazy image) — same filter extractMediaFromSnapshot uses to exclude tiny
+        // avatars/icons from being mistaken for the ad creative.
+        const MIN_CREATIVE_DIM = 150;
+        const mediaUrls: string[] = [];
         div.querySelectorAll('img[src*="scontent"], img[src*="fbcdn"]').forEach((img) => {
-          const src = (img as HTMLImageElement).src;
-          if (src && !src.includes("emoji") && (img as HTMLImageElement).width > 50 && !imageUrls.includes(src)) {
-            imageUrls.push(src);
+          const el = img as HTMLImageElement;
+          if (
+            el.src &&
+            !el.src.includes("emoji") &&
+            (el.naturalWidth >= MIN_CREATIVE_DIM || el.naturalHeight >= MIN_CREATIVE_DIM) &&
+            !mediaUrls.includes(el.src)
+          ) {
+            mediaUrls.push(el.src);
           }
         });
         div.querySelectorAll('img[data-src*="scontent"], img[data-src*="fbcdn"]').forEach((img) => {
           const dataSrc = (img as HTMLElement).dataset.src;
-          if (dataSrc && !imageUrls.includes(dataSrc)) imageUrls.push(dataSrc);
+          if (dataSrc && !mediaUrls.includes(dataSrc)) mediaUrls.push(dataSrc);
         });
         div.querySelectorAll('[style*="background-image"]').forEach((el) => {
           const match = (el as HTMLElement).style.backgroundImage.match(/url\(["']?(https:[^"')]+)["']?\)/);
-          if (match && (match[1].includes("scontent") || match[1].includes("fbcdn")) && !imageUrls.includes(match[1])) {
-            imageUrls.push(match[1]);
+          if (match && (match[1].includes("scontent") || match[1].includes("fbcdn")) && !mediaUrls.includes(match[1])) {
+            mediaUrls.push(match[1]);
           }
+        });
+        // Video was never captured here at all before — the old network-response
+        // listener only ever checked for an image content-type.
+        div.querySelectorAll("video").forEach((video) => {
+          const v = video as HTMLVideoElement;
+          if (v.src && !mediaUrls.includes(v.src)) mediaUrls.push(v.src);
+          if (v.poster && !mediaUrls.includes(v.poster)) mediaUrls.push(v.poster);
+        });
+        div.querySelectorAll("video source").forEach((source) => {
+          const src = (source as HTMLSourceElement).src;
+          if (src && !mediaUrls.includes(src)) mediaUrls.push(src);
         });
 
         results.push({
@@ -259,40 +275,14 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
           ad_creative_link_titles: headline ? [headline] : null,
           ad_creative_bodies: adCopy ? [adCopy] : null,
           ad_creative_link_captions: ctaText ? [ctaText] : null,
-          _image_urls: imageUrls,
+          _image_urls: mediaUrls,
         });
       });
 
       return results;
     })) as RawAd[];
 
-    console.log(`Playwright extracted ${ads.length} ads, captured ${capturedImages.size} images from network`);
-
-    let matchedCount = 0;
-    for (const ad of ads) {
-      ad._media_data = [];
-      for (const imgUrl of (ad._image_urls ?? []).slice(0, 5)) {
-        const data = capturedImages.get(imgUrl);
-        if (data) {
-          ad._media_data.push({ url: imgUrl, type: "image", content_type: "image/jpeg", data });
-          matchedCount++;
-        }
-      }
-    }
-    console.log(`Matched ${matchedCount} images to ads`);
-
-    if (matchedCount < ads.length / 2 && capturedImages.size > 0) {
-      console.log("Low match rate, distributing captured images to ads");
-      const remaining = Array.from(capturedImages.entries());
-      let imgIdx = 0;
-      for (const ad of ads) {
-        if ((ad._media_data?.length ?? 0) === 0 && imgIdx < remaining.length) {
-          const [url, data] = remaining[imgIdx];
-          ad._media_data!.push({ url, type: "image", content_type: "image/jpeg", data });
-          imgIdx++;
-        }
-      }
-    }
+    console.log(`Playwright extracted ${ads.length} ads`);
 
     return ads.slice(0, limit);
   } finally {
