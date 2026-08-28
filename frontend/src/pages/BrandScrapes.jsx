@@ -37,6 +37,20 @@ const BrandScrapes = () => {
         fetchScrapes();
     }, []);
 
+    // scrapeBrand runs as a fire-and-forget background job server-side (see
+    // research.ts's POST /brand-scrapes) that can take a minute or more, but nothing
+    // ever re-fetched status after the initial load — confirmed live that a scrape
+    // which had genuinely finished (status: completed, 30 ads) still showed "scraping"
+    // indefinitely until a manual page reload. Polls only while at least one scrape is
+    // still pending/scraping, and stops itself once everything reaches a terminal state.
+    useEffect(() => {
+        const hasActiveScrape = scrapes.some((s) => s.status === 'pending' || s.status === 'scraping');
+        if (!hasActiveScrape) return;
+
+        const interval = setInterval(fetchScrapes, 5000);
+        return () => clearInterval(interval);
+    }, [scrapes]);
+
     const fetchScrapes = async () => {
         try {
             const data = await getBrandScrapes();
