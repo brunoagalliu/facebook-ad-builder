@@ -97,6 +97,21 @@ async function fetchPageAds(pageId: string, brandName?: string, limit = 500): Pr
     }
   }
 
+  // Unlike keyword search (where a small result count is usually a real, exact match
+  // count — see researchService.ts), search_page_ids is confirmed unreliable for full
+  // page-archive retrieval: tested live against a page the real Ads Library website
+  // shows 110+ ads for, across 5 different ad_reached_countries values, the API never
+  // returned more than 1. The website evidently uses a different, undocumented
+  // endpoint internally. Prefer whichever source actually returns more for this path.
+  if (ads.length < 5) {
+    try {
+      const playwrightAds = await playwrightScrapeAds(pageId, limit, false);
+      if (playwrightAds.length > ads.length) return playwrightAds;
+    } catch (err) {
+      console.error("Playwright supplement failed, using API result as-is:", err);
+    }
+  }
+
   return ads;
 }
 
