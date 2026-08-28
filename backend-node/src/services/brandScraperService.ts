@@ -229,20 +229,21 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
           if (match) pageId = match[1];
         });
 
-        // naturalWidth/naturalHeight (the actual bitmap's real dimensions), not
-        // .width (rendered/CSS layout size, unreliable — 0 for a not-yet-laid-out or
-        // lazy image) — same filter extractMediaFromSnapshot uses to exclude tiny
-        // avatars/icons from being mistaken for the ad creative.
-        const MIN_CREATIVE_DIM = 150;
+        // Filters on the URL itself (Facebook's avatar/icon CDN URLs embed a size hint
+        // like "stp=dst-jpg_s60x60_tt6"), not naturalWidth/naturalHeight — confirmed
+        // live that gating on natural dimensions regressed to zero images captured at
+        // all: at this scroll-and-evaluate timing (no networkidle wait, unlike
+        // extractMediaFromSnapshot), many genuinely-present creative images simply
+        // hadn't finished loading their bytes yet, so their natural size read as 0 and
+        // got wrongly excluded alongside real avatars.
+        const isLikelyAvatarUrl = (url: string) => {
+          const sizeMatch = url.match(/[_/]s(\d+)x(\d+)/);
+          return sizeMatch ? Number(sizeMatch[1]) < 150 && Number(sizeMatch[2]) < 150 : false;
+        };
         const mediaUrls: string[] = [];
         div.querySelectorAll('img[src*="scontent"], img[src*="fbcdn"]').forEach((img) => {
           const el = img as HTMLImageElement;
-          if (
-            el.src &&
-            !el.src.includes("emoji") &&
-            (el.naturalWidth >= MIN_CREATIVE_DIM || el.naturalHeight >= MIN_CREATIVE_DIM) &&
-            !mediaUrls.includes(el.src)
-          ) {
+          if (el.src && !el.src.includes("emoji") && !isLikelyAvatarUrl(el.src) && !mediaUrls.includes(el.src)) {
             mediaUrls.push(el.src);
           }
         });
