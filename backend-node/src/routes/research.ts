@@ -1,3 +1,4 @@
+import type { BrandScrape, BrandScrapedAd } from "@prisma/client";
 import { Router } from "express";
 
 import { prisma } from "../core/prisma";
@@ -527,6 +528,47 @@ router.delete(
 
 // ============= Brand Scrape Endpoints =============
 
+// These three routes returned raw Prisma objects (camelCase: pageId, brandName, ...)
+// straight through with no serialization — every other route in this file/app
+// translates to the snake_case shape the frontend actually reads (page_id, brand_name,
+// ...), so BrandScrapes.jsx's `scrape.page_id` etc. were always undefined. Confirmed
+// live: showed as "Page ID: undefined" in the UI.
+function serializeBrandScrape(s: BrandScrape) {
+  return {
+    id: s.id,
+    brand_name: s.brandName,
+    page_id: s.pageId,
+    page_name: s.pageName,
+    page_url: s.pageUrl,
+    total_ads: s.totalAds,
+    media_downloaded: s.mediaDownloaded,
+    status: s.status,
+    error_message: s.errorMessage,
+    created_at: s.createdAt,
+    updated_at: s.updatedAt,
+  };
+}
+
+function serializeBrandScrapedAd(a: BrandScrapedAd) {
+  return {
+    id: a.id,
+    brand_scrape_id: a.brandScrapeId,
+    external_id: a.externalId,
+    page_name: a.pageName,
+    page_link: a.pageLink,
+    headline: a.headline,
+    ad_copy: a.adCopy,
+    cta_text: a.ctaText,
+    media_type: a.mediaType,
+    media_urls: a.mediaUrls,
+    original_media_urls: a.originalMediaUrls,
+    platforms: a.platforms,
+    start_date: a.startDate,
+    ad_link: a.adLink,
+    created_at: a.createdAt,
+  };
+}
+
 router.post(
   "/brand-scrapes",
   validateBody(brandScrapeCreateSchema),
@@ -549,14 +591,15 @@ router.post(
     // Fire-and-forget background scrape, matching the Python route's BackgroundTasks usage.
     scrapeBrand(brandScrape.id).catch((err) => console.error("Background scrape error:", err));
 
-    res.json(brandScrape);
+    res.json(serializeBrandScrape(brandScrape));
   })
 );
 
 router.get(
   "/brand-scrapes",
   asyncHandler(async (_req, res) => {
-    res.json(await prisma.brandScrape.findMany({ orderBy: { createdAt: "desc" } }));
+    const scrapes = await prisma.brandScrape.findMany({ orderBy: { createdAt: "desc" } });
+    res.json(scrapes.map(serializeBrandScrape));
   })
 );
 
@@ -568,7 +611,7 @@ router.get(
       res.status(404).json({ detail: "Brand scrape not found" });
       return;
     }
-    res.json(scrape);
+    res.json({ ...serializeBrandScrape(scrape), ads: scrape.ads.map(serializeBrandScrapedAd) });
   })
 );
 
