@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
+  <img src="frontend/public/breadwinner_logo.png" alt="BreadWinner" width="120" />
 </p>
 
-<h1 align="center">Facebook Ad Builder</h1>
+<h1 align="center">BreadWinner</h1>
 
 <p align="center">
   <strong>AI-powered Facebook ad automation platform</strong><br>
-  From competitor research to ad generation and campaign management
+  Competitor research, AI blueprint learning, and multi-model ad generation — all the way to a live campaign
 </p>
 
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#documentation">Documentation</a> •
+  <a href="#architecture">Architecture</a> •
   <a href="#deployment">Deployment</a>
 </p>
 
@@ -20,61 +20,51 @@
   <img src="https://img.shields.io/badge/node-18+-green.svg" alt="Node 18+">
   <img src="https://img.shields.io/badge/react-19-61dafb.svg" alt="React 19">
   <img src="https://img.shields.io/badge/express-4-000000.svg" alt="Express">
-  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License">
-</p>
-
-<p align="center">
-  Created by <strong>Jason Akatiff</strong><br>
-  <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
-  <a href="https://t.me/jasonakatiff">Telegram</a> • <a href="mailto:jason@jasonakatiff.com">jason@jasonakatiff.com</a>
+  <img src="https://img.shields.io/badge/postgresql-15+-336791.svg" alt="PostgreSQL">
 </p>
 
 ---
 
 ## Overview
 
-Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
+BreadWinner takes a Facebook ad from "what's working for competitors" to "live in Ads Manager," with AI doing the heavy lifting at every stage in between. Scrape real competitor ads (either by keyword search against Meta's Ad Library API, or by pointing at a specific competitor's Facebook Page and letting a headless browser pull their whole archive), have Gemini deconstruct what's structurally winning about them into a reusable blueprint, then generate new on-brand ad copy, images, and video from those blueprints — choosing a single reference ad or a synthesized pattern learned across an entire niche. Push the result straight into a Facebook campaign, or export it.
 
 ### Key Capabilities
 
-- **Competitor Intelligence** — Scrape and analyze ads from the Facebook Ad Library
-- **AI Content Generation** — Create ad copy and images using Google Gemini and Fal.ai
-- **Brand Management** — Maintain consistent brand voice, colors, and assets
-- **Template System** — Deconstruct winning ads into reusable blueprints
-- **Campaign Management** — Create and manage Facebook campaigns via API
+- **Competitor Intelligence** — keyword search against Meta's official Ad Library API, or full-archive scraping of a specific competitor page via Playwright
+- **AI Blueprint Learning** — Gemini vision/video analysis turns a winning ad into a structural blueprint (layout, narrative arc, hooks, pacing, psychological triggers), auto-tagged with a detected niche/vertical
+- **Multi-Model Ad Generation** — image generation (Nano Banana Pro / Google Imagen) and video generation (Seedance 2.0 continuous-take, or Kling O3 real multi-shot storyboarding), each steerable from one specific winning ad or a synthesis across a whole vertical's proven patterns
+- **Real Reference Images** — capture a live screenshot of a product's actual landing page/signup form so generated ads can show it, not an AI-imagined guess
+- **Brand & Product Management** — brand voice, colors, verticals, and a product catalog with per-product creative assets
+- **Facebook Campaign Management** — create and manage campaigns, ad sets, and ads directly via the Marketing API
 
 ---
 
 ## Features
 
 ### 🔍 Competitor Research
-Scrape ads directly from Facebook's Ad Library. Analyze competitor strategies, track active campaigns, and identify winning ad formats.
+Two complementary paths: keyword search against Meta's Ad Library API (fast, precise, works within a saved search + vertical), and full-archive Brand Scraping for a specific competitor's Facebook Page (Playwright-driven, since Meta's page-based search API is unreliable for retrieving a page's complete ad history). Scraped ads carry real media, copy, and platform data.
 
-### 🎨 Brand Management
-Create and manage brand profiles with:
-- Brand voice and messaging guidelines
-- Color palettes (primary, secondary, highlight)
-- Logo and visual assets
-- Multiple products per brand
+### 🧠 AI Blueprint Engine (Ad Remix)
+Promote any scraped ad — or a manually uploaded one — into a **Winning Ad** template. Gemini vision analyzes image ads for layout, narrative arc, text hierarchy, and psychological triggers; Gemini's video understanding does the same for video ads (hook type, pacing, cinematography, authenticity signals), plus auto-detects and tags the ad's niche/vertical so it's immediately reusable for any brand in that space.
 
-### 🤖 AI-Powered Ad Generation
-Generate high-converting ads using AI:
-- **Copy Generation** — Compelling headlines, body text, and CTAs
-- **Image Generation** — AI-created visuals via Fal.ai
-- **Ad Remix** — Transform winning competitor ads into your brand style
+### 🎨 Image & Video Generation
+Generate new ads informed by what's already proven to work:
+- **Image ads** — Nano Banana Pro or Google Imagen, with a choice of a hand-picked style, one specific winning ad, or a meta-blueprint synthesized across an entire vertical's pool of winners
+- **Video ads** — Seedance 2.0 for a single continuous UGC-style take, or Kling O3 for real multi-shot storyboarding (up to 6 distinct cuts in one generation), with the same single-ad/whole-vertical choice
+- **Real reference images** — product photos, or a live Playwright screenshot of the product's actual signup form, feed generation as reference material instead of relying on the model's imagination
 
-### 📋 Template Library
-Build a library of proven ad structures:
-- Deconstruct successful ads into blueprints
-- Reuse templates across brands and products
-- Track performance by template type
+### 🏷️ Brand & Product Management
+- Brand voice, messaging guidelines, and color palette
+- Verticals for organizing brands and blueprints by niche
+- Product catalog with images, description, and a landing-page URL (screenshottable as a reference asset)
+- Customer profiles for audience targeting context
 
-### 📊 Campaign Management
-Manage Facebook campaigns directly:
-- Create campaigns, ad sets, and ads
-- Upload creative assets
-- Monitor campaign status
-- Sync with Facebook Ads Manager
+### 📊 Facebook Campaign Management
+Create and manage campaigns, ad sets, and ads directly through the Marketing API, upload creative assets, and track sync status against Facebook Ads Manager.
+
+### 🗂️ Generated Ads Gallery
+Every generated ad is grouped by bundle, browsable and exportable to CSV, with headline/body/CTA and media all in one place.
 
 ---
 
@@ -83,23 +73,17 @@ Manage Facebook campaigns directly:
 ### Prerequisites
 
 - **Node.js** 18+ ([download](https://nodejs.org))
-- **PostgreSQL** 15+ (local or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
+- **PostgreSQL** 15+ (local, or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
 
-### Option 1: Interactive Setup (Recommended)
-
-Run the setup wizard which will guide you through the entire configuration:
+### Option 1: Interactive Setup
 
 ```bash
-git clone https://github.com/yourusername/facebook_ad_builder.git
+git clone <your-fork-url>
 cd facebook_ad_builder
 ./setup.sh
 ```
 
-The wizard will:
-1. Check all prerequisites
-2. Walk you through configuring API keys
-3. Set up the database
-4. Create your admin account
+The wizard checks prerequisites, walks through API key configuration, sets up the database, and creates your admin account.
 
 ### Option 2: Manual Setup
 
@@ -109,16 +93,11 @@ The wizard will:
 #### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/facebook_ad_builder.git
+git clone <your-fork-url>
 cd facebook_ad_builder
 
-# Backend
-cd backend-node
-npm install
-
-# Frontend
-cd ../frontend
-npm install
+cd backend-node && npm install
+cd ../frontend && npm install
 ```
 
 #### 2. Configure Environment
@@ -127,7 +106,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your credentials. See [Environment Variables](#environment-variables) for details.
+Edit `.env.local` with your credentials — see [Environment Variables](#environment-variables).
 
 #### 3. Initialize Database
 
@@ -140,13 +119,11 @@ npx tsx prisma/seed.ts
 #### 4. Start the Application
 
 ```bash
-# Terminal 1: Backend
-cd backend-node
-npm run dev
+# Terminal 1
+cd backend-node && npm run dev
 
-# Terminal 2: Frontend
-cd frontend
-npm run dev
+# Terminal 2
+cd frontend && npm run dev
 ```
 
 </details>
@@ -162,61 +139,52 @@ npm run dev
 
 ## External Services
 
-### Required Services
+### Required
 
-| Service | Purpose | Setup Guide |
-|---------|---------|-------------|
+| Service | Purpose | Setup |
+|---------|---------|-------|
 | **PostgreSQL** | Database | Local install, [Railway](https://railway.app), or [Supabase](https://supabase.com) |
-| **Google Gemini** | AI text generation & vision | [Get API Key](https://aistudio.google.com/app/apikey) |
+| **Google Gemini** | Ad copy, blueprint analysis, image/video understanding | [Get API Key](https://aistudio.google.com/app/apikey) |
 
-### Optional Services
+### Optional
 
-| Service | Purpose | Setup Guide |
-|---------|---------|-------------|
-| **Facebook Marketing API** | Campaign management, Ad Library | [Developer Portal](https://developers.facebook.com) |
-| **Fal.ai** | AI image generation | [fal.ai](https://fal.ai) |
-| **Cloudflare R2** | Image/video storage | [Cloudflare Dashboard](https://dash.cloudflare.com) |
+| Service | Purpose | Setup |
+|---------|---------|-------|
+| **Facebook Marketing API** | Campaign management, Ad Library research | [Developer Portal](https://developers.facebook.com) |
+| **Kie.ai** | Image generation (Nano Banana Pro) and video generation (Seedance 2.0, Kling O3) | [kie.ai](https://kie.ai) |
+| **Fal.ai** | Image generation fallback | [fal.ai](https://fal.ai) |
+| **Cloudflare R2** | Media storage; falls back to local disk if unset | [Cloudflare Dashboard](https://dash.cloudflare.com) |
 
 ### Facebook Developer Setup
 
 <details>
-<summary>Click to expand Facebook API setup</summary>
+<summary>Click to expand</summary>
 
-1. Go to [developers.facebook.com](https://developers.facebook.com)
-2. Create a new app → Select "Business" type
-3. Add the "Marketing API" product
-4. Go to Tools → Graph API Explorer
-5. Generate a User Access Token with these permissions:
-   - `ads_management`
-   - `ads_read`
-   - `business_management`
-6. Find your Ad Account ID in [Ads Manager](https://adsmanager.facebook.com) → Settings
+1. Go to [developers.facebook.com](https://developers.facebook.com), create an app (Business type), add the Marketing API product.
+2. Graph API Explorer → generate a User Access Token with `ads_management`, `ads_read`, `business_management`.
+3. Find your Ad Account ID in [Ads Manager](https://adsmanager.facebook.com) → Settings.
 
 ```bash
-# Add to .env.local
 FACEBOOK_ACCESS_TOKEN=your-token
 FACEBOOK_AD_ACCOUNT_ID=act_123456789
 FACEBOOK_APP_ID=your-app-id
 FACEBOOK_APP_SECRET=your-app-secret
 ```
 
-> **Note:** Access tokens expire after ~60 days. For production, implement token refresh.
+> Access tokens expire after ~60 days. Ad Library research uses a separate token from campaign publishing — see the app's Dashboard for expiry warnings.
 
 </details>
 
 ### Cloudflare R2 Setup
 
 <details>
-<summary>Click to expand R2 storage setup</summary>
+<summary>Click to expand</summary>
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → R2
-2. Create a bucket (e.g., `facebook-ads`)
-3. Go to R2 → Manage R2 API Tokens → Create API token
-4. Grant read/write permissions for your bucket
-5. Enable public access: Bucket Settings → Public Access → Enable R2.dev subdomain
+1. [Cloudflare Dashboard](https://dash.cloudflare.com) → R2 → create a bucket.
+2. R2 → Manage API Tokens → create a token with read/write on the bucket.
+3. Bucket Settings → Public Access → enable the R2.dev subdomain.
 
 ```bash
-# Add to .env.local
 R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
@@ -224,76 +192,30 @@ R2_BUCKET_NAME=facebook-ads
 R2_PUBLIC_URL=https://pub-xxx.r2.dev
 ```
 
+If unset, uploads fall back to local disk automatically.
+
 </details>
 
 ---
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+Create `.env.local` in the project root:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `SECRET_KEY` | ✅ | JWT signing key (generate random string) |
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key |
+| `SECRET_KEY` | ✅ | JWT signing key |
+| `GEMINI_API_KEY` | ✅ | Google Gemini — ad copy, blueprint analysis, vision/video understanding |
 | `ALLOWED_ORIGINS` | Production | Comma-separated CORS origins |
-| `FACEBOOK_ACCESS_TOKEN` | For FB features | Facebook Marketing API token |
+| `FACEBOOK_ACCESS_TOKEN` | For campaign publishing | Facebook Marketing API token |
+| `FACEBOOK_ADS_LIBRARY_TOKEN` | For research | Separate token for Ad Library search |
 | `FACEBOOK_AD_ACCOUNT_ID` | For FB features | Facebook Ad Account ID |
-| `R2_*` | For uploads | Cloudflare R2 credentials |
-| `FAL_AI_API_KEY` | For image gen | Fal.ai API key |
+| `KIE_AI_API_KEY` | For image/video generation | Nano Banana Pro, Seedance, Kling O3 |
+| `FAL_AI_API_KEY` | Image gen fallback | Fal.ai API key |
+| `R2_*` | For persistent storage | Cloudflare R2 credentials |
 
-See `.env.example` for all available options.
-
----
-
-## Usage Guide
-
-### 1. Create a Brand
-
-Navigate to **Brands** → **New Brand**
-
-- Enter brand name and description
-- Upload logo
-- Set brand colors (primary, secondary, highlight)
-- Define brand voice/tone guidelines
-
-### 2. Add Products
-
-Navigate to **Products** → **New Product**
-
-- Select the parent brand
-- Add product name and description
-- Upload product images
-- Set default landing page URL
-
-### 3. Research Competitors
-
-Navigate to **Research** → **Scrape Brand Ads**
-
-- Enter a competitor's Facebook Page ID or URL
-- View their active ads
-- Save interesting ads for reference
-- Analyze ad copy and creative patterns
-
-### 4. Generate Ads
-
-Navigate to **Create Ads**
-
-- Select brand and product
-- Choose a template or start fresh
-- AI generates multiple ad variations
-- Edit and refine as needed
-- Export or push to Facebook
-
-### 5. Manage Campaigns
-
-Navigate to **Campaigns**
-
-- Create new campaigns
-- Set up ad sets with targeting
-- Add ads with your generated creative
-- Monitor performance
+See `.env.example` for the full list.
 
 ---
 
@@ -301,30 +223,33 @@ Navigate to **Campaigns**
 
 ```
 facebook_ad_builder/
-├── backend-node/            # Node.js + TypeScript (Express, Prisma)
+├── backend-node/               # Node.js + TypeScript (Express, Prisma)
 │   ├── src/
-│   │   ├── routes/         # REST endpoints
-│   │   │   ├── brands.ts
-│   │   │   ├── products.ts
-│   │   │   ├── research.ts
-│   │   │   ├── adRemix.ts
-│   │   │   └── facebook.ts
-│   │   ├── services/       # Business logic
-│   │   │   ├── facebookService.ts
-│   │   │   ├── adRemixService.ts
-│   │   │   └── scraperService.ts
-│   │   ├── app.ts          # Express app wiring
-│   │   └── index.ts        # Entry point
-│   ├── prisma/             # Schema, migrations, seed
+│   │   ├── routes/            # REST endpoints (/api/v1/*)
+│   │   ├── services/          # Business logic
+│   │   │   ├── researchService.ts        # Ad Library keyword search
+│   │   │   ├── brandScraperService.ts    # Playwright brand/page scraping
+│   │   │   ├── winnerPromotionService.ts # Scraped ad -> Winning Ad blueprint
+│   │   │   ├── adRemixService.ts         # Image blueprint deconstruction/reconstruction
+│   │   │   ├── videoBlueprintService.ts  # Video blueprint deconstruction
+│   │   │   ├── blueprintSelectionService.ts   # Per-brand blueprint auto-pick
+│   │   │   ├── blueprintSynthesisService.ts   # Whole-vertical blueprint synthesis
+│   │   │   ├── imageGenerationService.ts # Nano Banana Pro / Imagen / Fal.ai
+│   │   │   ├── videoGenerationService.ts # Seedance 2.0 / Kling O3
+│   │   │   ├── screenshotService.ts      # Landing-page reference screenshots
+│   │   │   └── facebookService.ts        # Marketing API
+│   │   ├── app.ts             # Express app wiring
+│   │   └── index.ts           # Entry point
+│   ├── prisma/                # Schema, migrations, seed
 │   └── package.json
-├── frontend/               # React + Vite
+├── frontend/                   # React + Vite
 │   ├── src/
-│   │   ├── pages/         # Route components
-│   │   ├── components/    # Reusable UI
-│   │   ├── context/       # React context
-│   │   └── lib/           # Utilities
+│   │   ├── pages/             # Route components (Research, ImageAds, VideoAds, ...)
+│   │   ├── components/        # Reusable UI
+│   │   ├── context/           # React context (Brand, Toast, Auth, Campaign)
+│   │   └── lib/                # Utilities
 │   └── package.json
-└── .env.example           # Environment template
+└── .env.example
 ```
 
 ### Tech Stack
@@ -334,52 +259,27 @@ facebook_ad_builder/
 | Frontend | React 19, Vite, TailwindCSS |
 | Backend | Node.js, TypeScript, Express, Prisma |
 | Database | PostgreSQL |
-| AI | Google Gemini, Fal.ai |
-| Storage | Cloudflare R2 |
+| Scraping | Playwright |
+| AI text/vision/video | Google Gemini |
+| AI image/video generation | Kie.ai (Nano Banana Pro, Seedance 2.0, Kling O3), Fal.ai |
+| Storage | Cloudflare R2 (local disk fallback) |
 | Auth | JWT (access + refresh tokens) |
-
----
-
-## API Reference
-
-### Key Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/auth/login` | Authenticate user |
-| `GET` | `/api/v1/brands` | List all brands |
-| `POST` | `/api/v1/brands` | Create a brand |
-| `GET` | `/api/v1/products` | List all products |
-| `POST` | `/api/v1/research/scrape` | Scrape competitor ads |
-| `POST` | `/api/v1/ad-remix/generate` | Generate ad variations |
-| `POST` | `/api/v1/facebook/campaigns` | Create Facebook campaign |
+| Hosting | Railway |
 
 ---
 
 ## Testing
 
-### E2E Tests (agent-browser)
-
 ```bash
-cd frontend
+# Frontend unit tests
+cd frontend && npm run test:unit
 
-# Run all smoke tests
+# Frontend E2E (agent-browser)
 npm run test:smoke
-
-# Run with authentication
-TEST_EMAIL=user@example.com TEST_PASSWORD=xxx npm run test
-```
-
-### Unit Tests
-
-```bash
-# Frontend
-cd frontend
-npm run test:unit
+TEST_EMAIL=user@example.com TEST_PASSWORD=xxx npm run test:auth
 
 # Backend
-cd backend-node
-npm test
+cd backend-node && npm test
 ```
 
 ---
@@ -388,29 +288,23 @@ npm test
 
 ### Railway (Recommended)
 
-Deploy to [Railway](https://railway.app) in minutes:
+1. Push this repo to your own GitHub account.
+2. [Create a new Railway project](https://railway.app/new) → Deploy from GitHub repo.
+3. Add a PostgreSQL database: **+ New** → **Database** → **PostgreSQL**.
+4. Set environment variables on both the backend and frontend services.
+5. Set `ALLOWED_ORIGINS` to your frontend's deployed URL.
 
-1. Fork this repo to your GitHub account
-2. [Create a new Railway project](https://railway.app/new)
-3. Click "Deploy from GitHub repo" and select your fork
-4. Add a PostgreSQL database: **+ New** → **Database** → **PostgreSQL**
-5. Set environment variables in both services (see `.env.example`)
-6. Set `ALLOWED_ORIGINS` to your frontend URL
-7. Deploy!
-
-> **Tip:** Railway auto-detects the `railway.toml` config and creates both backend and frontend services.
+Migrations run automatically on deploy via the backend's Dockerfile `CMD`.
 
 📖 **[Full Deployment Guide →](./RAILWAY_DEPLOYMENT.md)**
 
 ### Docker
 
 ```bash
-# Backend
 cd backend-node
 docker build -t fb-ad-backend .
 docker run -p 8000:8000 --env-file ../.env.local fb-ad-backend
 
-# Frontend
 cd frontend
 docker build -t fb-ad-frontend .
 docker run -p 5173:5173 fb-ad-frontend
@@ -423,35 +317,33 @@ docker run -p 5173:5173 fb-ad-frontend
 <details>
 <summary><strong>DATABASE_URL environment variable is required</strong></summary>
 
-- Ensure `.env.local` exists in the project root
-- Verify the DATABASE_URL format: `postgresql://user:pass@host:5432/dbname`
-- Check PostgreSQL is running: `pg_isready`
+- Ensure `.env.local` exists in the project root.
+- Verify the format: `postgresql://user:pass@host:5432/dbname`.
+- Check PostgreSQL is running: `pg_isready`.
 
 </details>
 
 <details>
 <summary><strong>CORS errors in browser</strong></summary>
 
-- Add your frontend URL to `ALLOWED_ORIGINS` in `.env.local`
-- Restart the backend server
+- Add your frontend URL to `ALLOWED_ORIGINS` in `.env.local`, restart the backend.
 
 </details>
 
 <details>
 <summary><strong>Facebook API errors</strong></summary>
 
-- Check if your access token has expired (they last ~60 days)
-- Verify Ad Account ID format: `act_123456789`
-- Ensure required permissions are granted
+- Access tokens expire after ~60 days — check the Dashboard for expiry warnings.
+- Ad Library research and campaign publishing use separate tokens; confirm you're using the right one.
+- Verify Ad Account ID format: `act_123456789`.
 
 </details>
 
 <details>
 <summary><strong>AI generation not working</strong></summary>
 
-- Verify `GEMINI_API_KEY` is set correctly
-- Check API quota at [Google AI Studio](https://aistudio.google.com)
-- For image generation, ensure `FAL_AI_API_KEY` is configured
+- Verify `GEMINI_API_KEY` is set and has quota at [Google AI Studio](https://aistudio.google.com).
+- For image/video generation, confirm `KIE_AI_API_KEY` (or `FAL_AI_API_KEY` as fallback) is set and has credits.
 
 </details>
 
@@ -459,32 +351,8 @@ docker run -p 5173:5173 fb-ad-frontend
 
 ## Contributing
 
-Contributions are welcome! Please:
-
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Commit your changes: `git commit -m 'Add amazing feature'`
 4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
-
----
-
-## Author
-
-**Jason Akatiff**
-
-- Website: [iSCALE.com](https://iscale.com) | [A4D.com](https://a4d.com)
-- Telegram: [@jasonakatiff](https://t.me/jasonakatiff)
-- Email: [jason@jasonakatiff.com](mailto:jason@jasonakatiff.com)
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using Express, React, and AI
-</p>
