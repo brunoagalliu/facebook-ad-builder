@@ -16,5 +16,10 @@ export const videoBlueprintSchema = z.object({
   dialogue_style: z.string(),
   psychological_triggers: z.array(z.string()),
   authenticity_signals: z.array(z.string()),
+  // Optional/tolerant, unlike every field above — same reasoning as
+  // adBlueprint.ts's detected_category: a freeform-text Gemini response with no
+  // structured-output config shouldn't have an occasional omission here nuke the
+  // whole blueprint parse.
+  detected_category: z.string().nullable().catch(null),
 });
 export type VideoBlueprint = z.infer<typeof videoBlueprintSchema>;

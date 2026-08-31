@@ -12,6 +12,7 @@ Watch this video and identify:
 6. Dialogue delivery style — tone, pace, energy
 7. What psychological triggers make it effective
 8. What specific signals make it read as authentic UGC rather than a staged/AI-generated ad (things like handheld camera jitter, imperfect lighting, natural pauses, casual setting)
+9. The business vertical/niche this ad is for — a short, generic 2-4 word category label (e.g. "Debt relief", "Weight loss supplements", "Solar installation", "Personal injury law"), not the specific brand or product name. Return null if genuinely unclear.
 
 Focus on STRUCTURE, not content. If it's a supplement ad, describe the "Problem-Solution hook into product demo" pattern, not the supplement itself.
 
@@ -25,7 +26,8 @@ Return ONLY valid JSON with this exact structure:
   "cinematography_style": "Camera framing/motion/lighting, written as a reusable shooting instruction",
   "dialogue_style": "Tone, pace, and energy of delivery",
   "psychological_triggers": ["List the triggers, e.g. Social Proof", "Urgency/Scarcity", "Identity Validation"],
-  "authenticity_signals": ["What makes this read as real UGC, e.g. handheld camera sway", "natural pauses", "imperfect lighting"]
+  "authenticity_signals": ["What makes this read as real UGC, e.g. handheld camera sway", "natural pauses", "imperfect lighting"],
+  "detected_category": "A short, generic 2-4 word niche/vertical label (e.g. 'Debt relief'), or null if unclear"
 }
 
 Do NOT include any other text. Return ONLY the JSON object.`;

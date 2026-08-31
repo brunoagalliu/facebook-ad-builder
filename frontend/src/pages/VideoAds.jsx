@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Video, Briefcase, Package, Users, Check, ChevronLeft, ChevronRight, Sparkles, Plus, Trash2, Download } from 'lucide-react';
+import { Video, Briefcase, Package, Users, Check, ChevronLeft, ChevronRight, Sparkles, Plus, Trash2, Download, Wand2, Film } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import BrandSelectionStep from '../components/steps/BrandSelectionStep';
 import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
+import ImageTemplateSelector from '../components/ImageTemplateSelector';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -18,9 +19,14 @@ const POLL_TIMEOUT_MS = 600_000;
 
 // Seedance generates one continuous clip per call, 4-15s total (no multi-shot API) —
 // scene durations are summed and clamped server-side, but the picker only offers
-// values that keep 1-3 scenes comfortably within that ceiling.
+// values that keep 1-3 scenes comfortably within that ceiling. Kling O3 (the second
+// model option below) genuinely supports up to 6 distinct shots/cuts within the same
+// 15s total, so it gets its own scene cap and shorter duration options — 6 scenes at
+// today's 3s floor would already exceed the ceiling.
 const SCENE_DURATION_OPTIONS = [3, 5, 7, 10, 15];
+const KLING_SCENE_DURATION_OPTIONS = [1, 2, 3, 5, 7, 10, 15];
 const MAX_TOTAL_DURATION = 15;
+const MAX_SCENES_BY_MODEL = { seedance: 3, 'kling-o3': 6 };
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -44,30 +50,78 @@ export default function VideoAds() {
     const [location, setLocation] = useState('');
     const [aspectRatio, setAspectRatio] = useState('portrait');
     const [scenes, setScenes] = useState([{ durationSeconds: 10, action: '' }]);
+    // Which video generation backend to use — 'seedance' (default, one continuous
+    // take) or 'kling-o3' (real multi-shot storyboarding, see backend's
+    // buildKlingInput). Mirrors ImageAds.jsx's model picker pattern.
+    const [model, setModel] = useState('seedance');
+    const maxScenes = MAX_SCENES_BY_MODEL[model];
+    const sceneDurationOptions = model === 'kling-o3' ? KLING_SCENE_DURATION_OPTIONS : SCENE_DURATION_OPTIONS;
+
+    const selectModel = (newModel) => {
+        // Switching back to Seedance while more scenes exist than it supports would
+        // leave stale scenes the "Add scene" cap silently prevents removing one at a
+        // time from ever being sent correctly — truncate up front instead.
+        if (newModel === 'seedance' && scenes.length > MAX_SCENES_BY_MODEL.seedance) {
+            setScenes((prev) => prev.slice(0, MAX_SCENES_BY_MODEL.seedance));
+        }
+        setModel(newModel);
+    };
 
     const [generating, setGenerating] = useState(false);
     const [generationState, setGenerationState] = useState(null); // 'waiting' | 'queuing' | 'generating' | 'success' | 'fail'
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState(null);
     const pollAbortRef = useRef(false);
 
-    // createVideoTask already auto-selects a video blueprint for the brand's vertical
-    // server-side (same rotating-pool logic ImageAds.jsx's auto-suggested template
-    // uses) to steer generation — this separately fetches that same pick just so the
-    // wizard can show it and let the user pull its hook line into the script, mirroring
-    // the image wizard's "Fill from Winning Ad" button.
-    const [autoVideoTemplate, setAutoVideoTemplate] = useState(null);
+    // Which winning-ad blueprint steers generation: 'auto' (default — createVideoTask
+    // already auto-selects one for the brand's vertical server-side, same rotating-pool
+    // logic ImageAds.jsx's auto-suggested template uses), 'single' (one specific
+    // WinningAd the user picks, mirroring ImageAds.jsx's "Browse Templates" mode — video
+    // had no equivalent before), or 'vertical' (a synthesized meta-blueprint combining
+    // the whole vertical's pool — see blueprintSynthesisService.ts). Whichever mode is
+    // active, selectedVideoTemplate ends up holding the resulting template so the rest
+    // of the wizard (hook-line fill, ready-to-generate banner, batch-save copy reuse)
+    // doesn't need to fork three ways — it just reads selectedVideoTemplate regardless
+    // of how it was populated.
+    const [templateMode, setTemplateMode] = useState('auto');
+    const [selectedVideoTemplate, setSelectedVideoTemplate] = useState(null);
+    const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+    const [loadingVerticalTemplate, setLoadingVerticalTemplate] = useState(false);
+
     useEffect(() => {
+        if (templateMode !== 'auto') return;
         const brandId = wizardData.brand?.id;
         const verticalId = wizardData.brand?.verticalId;
         if (!brandId || !verticalId) {
-            setAutoVideoTemplate(null);
+            setSelectedVideoTemplate(null);
             return;
         }
         authFetch(`${API_URL}/generated-ads/auto-video-template?brand_id=${brandId}`)
             .then(res => res.ok ? res.json() : null)
-            .then(setAutoVideoTemplate)
-            .catch(() => setAutoVideoTemplate(null));
-    }, [wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
+            .then(setSelectedVideoTemplate)
+            .catch(() => setSelectedVideoTemplate(null));
+    }, [templateMode, wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
+
+    const fetchVerticalTemplate = () => {
+        const brandId = wizardData.brand?.id;
+        if (!brandId) return;
+        setLoadingVerticalTemplate(true);
+        authFetch(`${API_URL}/generated-ads/auto-video-template?brand_id=${brandId}&mode=vertical`)
+            .then(res => res.ok ? res.json() : null)
+            .then(setSelectedVideoTemplate)
+            .catch(() => setSelectedVideoTemplate(null))
+            .finally(() => setLoadingVerticalTemplate(false));
+    };
+
+    const handleTemplateModeChange = (mode) => {
+        setTemplateMode(mode);
+        if (mode === 'single') {
+            setShowTemplatePicker(true);
+        } else if (mode === 'vertical') {
+            setSelectedVideoTemplate(null);
+            fetchVerticalTemplate();
+        }
+        // 'auto' repopulates itself via the effect above.
+    };
 
     // hook_transcript is just the opening line of a longer source ad — feeding it as
     // the *only* scene left the generated video with nothing to resolve into, trailing
@@ -75,7 +129,7 @@ export default function VideoAds() {
     // hook line). Building a real two-beat hook+CTA script instead of pasting an
     // isolated sentence gives the model something to land on.
     const buildScenesFromTemplate = () => {
-        const hook = autoVideoTemplate?.video_blueprint_json?.hook_transcript;
+        const hook = selectedVideoTemplate?.video_blueprint_json?.hook_transcript;
         if (!hook) return null;
         const productName = wizardData.product?.name || wizardData.brand?.name || 'this';
         return [
@@ -111,7 +165,7 @@ export default function VideoAds() {
             // scenes beyond the first still need real content, since there's no
             // per-scene blueprint data to substitute for those.
             case 4: return scenes.every((s, i) =>
-                s.action.trim().length > 0 || (i === 0 && Boolean(autoVideoTemplate?.video_blueprint_json?.hook_transcript))
+                s.action.trim().length > 0 || (i === 0 && Boolean(selectedVideoTemplate?.video_blueprint_json?.hook_transcript))
             );
             default: return true;
         }
@@ -153,7 +207,7 @@ export default function VideoAds() {
     };
 
     const addScene = () => {
-        if (scenes.length >= 3) return;
+        if (scenes.length >= maxScenes) return;
         setScenes(prev => [...prev, { durationSeconds: 3, action: '' }]);
     };
 
@@ -201,8 +255,8 @@ export default function VideoAds() {
         // backend's schema requires real, non-empty scene text (min(1)), it can't stay
         // blank on the wire even though the wizard let the user skip typing it.
         const scenesToSend = scenes.map((s, i) => {
-            if (i === 0 && !s.action.trim() && autoVideoTemplate?.video_blueprint_json?.hook_transcript) {
-                return { ...s, action: autoVideoTemplate.video_blueprint_json.hook_transcript };
+            if (i === 0 && !s.action.trim() && selectedVideoTemplate?.video_blueprint_json?.hook_transcript) {
+                return { ...s, action: selectedVideoTemplate.video_blueprint_json.hook_transcript };
             }
             return s;
         });
@@ -225,6 +279,9 @@ export default function VideoAds() {
                     location: location || undefined,
                     scenes: scenesToSend,
                     aspectRatio,
+                    model,
+                    mode: templateMode,
+                    templateId: templateMode === 'single' ? selectedVideoTemplate?.id : undefined,
                 })
             });
 
@@ -255,9 +312,9 @@ export default function VideoAds() {
                             // published as a real Facebook ad. Reuses the winning ad's
                             // own real copy (already surfaced via the raw ad-copy
                             // breakdown) rather than requiring a new manual step.
-                            headline: autoVideoTemplate?.headline || undefined,
-                            body: autoVideoTemplate?.body_text || undefined,
-                            cta: autoVideoTemplate?.cta_text || undefined,
+                            headline: selectedVideoTemplate?.headline || undefined,
+                            body: selectedVideoTemplate?.body_text || undefined,
+                            cta: selectedVideoTemplate?.cta_text || undefined,
                         }]
                     })
                 });
@@ -300,14 +357,14 @@ export default function VideoAds() {
                 use — bypasses Video Style entirely instead of requiring a click through
                 Character/Setting/Script when nothing in them needs customizing. */}
             {wizardData.brand && wizardData.product && wizardData.profile
-                && autoVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 5 && (
+                && selectedVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 5 && (
                 <div className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
                     <div className="flex items-center gap-3">
-                        {autoVideoTemplate.image_url && (
-                            <img src={autoVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                        {selectedVideoTemplate.image_url && (
+                            <img src={selectedVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                         )}
                         <div>
-                            <p className="font-medium text-gray-900">Ready to generate from {autoVideoTemplate.name}</p>
+                            <p className="font-medium text-gray-900">Ready to generate from {selectedVideoTemplate.name}</p>
                             <p className="text-sm text-gray-600">Skip Video Style — hook line and pacing pulled from this winning ad.</p>
                         </div>
                     </div>
@@ -408,6 +465,75 @@ export default function VideoAds() {
                 {currentStep === 4 && (
                     <div className="space-y-6">
                         <div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">Creative Reference</h3>
+                            <p className="text-sm text-gray-500 mb-3">
+                                Base this video on one specific winning ad, a synthesis of the whole vertical's proven patterns, or let it auto-pick.
+                            </p>
+                            <div className="flex gap-2 mb-3 bg-gray-100 p-1 rounded-lg w-fit">
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateModeChange('auto')}
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'auto' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                >
+                                    <div className="flex items-center gap-2"><Sparkles size={16} /> Auto</div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateModeChange('single')}
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'single' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                >
+                                    <div className="flex items-center gap-2"><Film size={16} /> Specific Ad</div>
+                                </button>
+                                {wizardData.brand?.verticalId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTemplateModeChange('vertical')}
+                                        className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'vertical' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                    >
+                                        <div className="flex items-center gap-2"><Wand2 size={16} /> Whole Vertical</div>
+                                    </button>
+                                )}
+                            </div>
+
+                            {templateMode === 'single' && (
+                                selectedVideoTemplate ? (
+                                    <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {selectedVideoTemplate.image_url && (
+                                                <img src={selectedVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                                            )}
+                                            <span className="text-sm font-medium text-gray-900 truncate">{selectedVideoTemplate.name}</span>
+                                        </div>
+                                        <button type="button" onClick={() => setShowTemplatePicker(true)} className="text-sm text-amber-700 hover:text-amber-800 font-medium whitespace-nowrap">
+                                            Change
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTemplatePicker(true)}
+                                        className="text-sm px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+                                    >
+                                        Browse winning ads…
+                                    </button>
+                                )
+                            )}
+
+                            {templateMode === 'vertical' && (
+                                loadingVerticalTemplate ? (
+                                    <div className="text-sm text-gray-500">Synthesizing patterns across this vertical's winning ads…</div>
+                                ) : selectedVideoTemplate ? (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <p className="text-sm font-medium text-gray-900">{selectedVideoTemplate.name}</p>
+                                        <p className="text-sm text-gray-600">Synthesized from {selectedVideoTemplate.source_count} winning ad{selectedVideoTemplate.source_count === 1 ? '' : 's'} in this vertical.</p>
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-gray-500">No analyzed winning ads found in this brand's vertical yet.</div>
+                                )
+                            )}
+                        </div>
+
+                        <div>
                             <h3 className="text-lg font-bold text-gray-900 mb-1">Character</h3>
                             <p className="text-sm text-gray-500 mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
                             <div className="grid grid-cols-2 gap-3">
@@ -455,10 +581,36 @@ export default function VideoAds() {
                         </div>
 
                         <div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">Video Model</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div
+                                    onClick={() => selectModel('seedance')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-amber-600 bg-amber-50' : 'border-gray-200 hover:border-amber-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-gray-900">Seedance 2.0 — Continuous Take</span>
+                                        {model === 'seedance' && <Check className="text-amber-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-gray-600">One fluid handheld shot, no cuts. (Default)</p>
+                                </div>
+                                <div
+                                    onClick={() => selectModel('kling-o3')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'kling-o3' ? 'border-amber-600 bg-amber-50' : 'border-gray-200 hover:border-amber-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-gray-900">Kling O3 — Multi-Shot</span>
+                                        {model === 'kling-o3' && <Check className="text-amber-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-gray-600">Up to 6 distinct shots/cuts. Higher cost per generation. Reference photos aren't used yet for this model.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="text-lg font-bold text-gray-900">Script</h3>
                                 <div className="flex items-center gap-3">
-                                    {autoVideoTemplate?.video_blueprint_json?.hook_transcript && (
+                                    {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && (
                                         <button
                                             type="button"
                                             onClick={fillFromWinningAd}
@@ -471,7 +623,7 @@ export default function VideoAds() {
                                     <button
                                         type="button"
                                         onClick={addScene}
-                                        disabled={scenes.length >= 3}
+                                        disabled={scenes.length >= maxScenes}
                                         className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         <Plus size={16} /> Add scene
@@ -479,8 +631,13 @@ export default function VideoAds() {
                                 </div>
                             </div>
                             <p className="text-sm text-gray-500 mb-1">
-                                Up to 3 scenes, {MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.
-                                {autoVideoTemplate?.video_blueprint_json?.hook_transcript && ' Scene 1 can stay blank to use the winning ad\'s own hook line directly.'}
+                                {model === 'kling-o3'
+                                    ? `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total — each scene renders as its own distinct shot/cut.`
+                                    : `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.`}
+                                {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && ' Scene 1 can stay blank to use the winning ad\'s own hook line directly.'}
+                            </p>
+                            <p className="text-sm text-gray-500 mb-1">
+                                Tip: for lead-gen offers, a scene like <span className="italic">"She holds her phone up, scrolling through the signup form — name, email, phone — and taps the button to submit"</span> renders as a natural phone reveal, not just narration.
                             </p>
                             <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-gray-400'}`}>
                                 {totalDuration}s / {MAX_TOTAL_DURATION}s{totalDuration > MAX_TOTAL_DURATION ? ' — will be trimmed to fit' : ''}
@@ -496,7 +653,7 @@ export default function VideoAds() {
                                                     onChange={(e) => updateScene(i, 'durationSeconds', Number(e.target.value))}
                                                     className="text-sm border border-gray-300 rounded px-2 py-1"
                                                 >
-                                                    {SCENE_DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d}s</option>)}
+                                                    {sceneDurationOptions.map((d) => <option key={d} value={d}>{d}s</option>)}
                                                 </select>
                                             </div>
                                             {scenes.length > 1 && (
@@ -509,7 +666,7 @@ export default function VideoAds() {
                                             value={scene.action}
                                             onChange={(e) => updateScene(i, 'action', e.target.value)}
                                             placeholder={
-                                                i === 0 && autoVideoTemplate?.video_blueprint_json?.hook_transcript
+                                                i === 0 && selectedVideoTemplate?.video_blueprint_json?.hook_transcript
                                                     ? "Leave blank to use the winning ad's own hook line"
                                                     : 'e.g. She holds up the product, smiling: "Okay, so this might sound crazy, but I swear this actually worked."'
                                             }
@@ -609,6 +766,20 @@ export default function VideoAds() {
                     </button>
                 )}
             </div>
+
+            {/* Single-ad mode's picker — reuses ImageTemplateSelector (already renders
+                a video badge for media_type === 'video' rows) filtered to only
+                video-capable templates, instead of building a separate component. */}
+            {showTemplatePicker && (
+                <ImageTemplateSelector
+                    mediaTypeFilter="video"
+                    onSelect={(template) => {
+                        setSelectedVideoTemplate(template);
+                        setShowTemplatePicker(false);
+                    }}
+                    onClose={() => setShowTemplatePicker(false)}
+                />
+            )}
         </div>
     );
 }

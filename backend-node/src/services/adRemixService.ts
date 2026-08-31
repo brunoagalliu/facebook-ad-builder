@@ -16,14 +16,20 @@ import { settings } from "../core/config";
 import { RECONSTRUCTION_PROMPT_TEMPLATE, DECONSTRUCTION_PROMPT } from "../prompts/adRemixPrompts";
 import { AdBlueprint, AdConcept, BrandData, adBlueprintSchema, adConceptSchema } from "../schemas/adBlueprint";
 import { extractJsonFromText } from "../utils/json";
+import { withTransientRetry } from "../utils/retry";
 
 // gemini-1.5-flash (the Python original's model) has been deprecated/retired by
 // Google, and even gemini-2.5-flash turned out to be blocked for new API keys
-// despite still being listed by ListModels — Google is rotating model versions
-// faster than this app can track by hardcoding one. Using the "-latest" alias so
-// it always resolves to whatever flash-tier model Google currently supports,
-// rather than hardcoding a specific version that will eventually get cut off again.
-const MODEL = "gemini-flash-latest";
+// despite still being listed by ListModels. This used to point at the "gemini-
+// flash-latest" alias on the theory that it'd always resolve to whatever flash-tier
+// model Google currently supports — but confirmed live that the alias itself can be
+// the unreliable part: it returned a sustained 503 "high demand" for every request
+// (even a trivial text-only one, hitting the API directly) while this exact pinned
+// version answered instantly. Pinned for now since a working specific version beats
+// a broken "latest" alias; if this one gets deprecated like gemini-2.5-flash did,
+// re-verify with ListModels + a direct curl test before swapping, rather than
+// assuming the next "-latest" alias is trustworthy.
+const MODEL = "gemini-3.6-flash";
 const uploadsDir = path.join(__dirname, "..", "..", "uploads");
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -67,7 +73,7 @@ export async function deconstructTemplate(templateImageUrl: string): Promise<AdB
     const model = getClient().getGenerativeModel({ model: MODEL });
     const { mimeType, data } = await fetchImageAsBase64(templateImageUrl);
 
-    const result = await model.generateContent([DECONSTRUCTION_PROMPT, { inlineData: { mimeType, data } }]);
+    const result = await withTransientRetry(() => model.generateContent([DECONSTRUCTION_PROMPT, { inlineData: { mimeType, data } }]));
     const blueprintData = extractJsonFromText(result.response.text());
     return adBlueprintSchema.parse(blueprintData);
   } catch (err) {

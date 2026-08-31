@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-export default function ImageTemplateSelector({ onSelect, onClose, embedded = false }) {
+export default function ImageTemplateSelector({ onSelect, onClose, embedded = false, mediaTypeFilter = null }) {
     const { showError } = useToast();
     const { authFetch } = useAuth();
     const [templates, setTemplates] = useState([]);
@@ -33,7 +33,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     // Fetch templates when filters change
     useEffect(() => {
         fetchTemplates();
-    }, [selectedCategory, selectedStyle, selectedVertical]);
+    }, [selectedCategory, selectedStyle, selectedVertical, mediaTypeFilter]);
 
     const fetchFilters = async () => {
         try {
@@ -54,6 +54,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
             if (selectedCategory) params.append('category', selectedCategory);
             if (selectedStyle) params.append('style', selectedStyle);
             if (selectedVertical) params.append('vertical', selectedVertical);
+            if (mediaTypeFilter) params.append('media_type', mediaTypeFilter);
 
             const response = await authFetch(`${API_URL}/templates/?${params}`);
             if (response.ok) {

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, Loader } from 'lucide-react';
+import { X, Upload, Loader, Camera } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,9 +15,11 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
         name: '',
         description: '',
         brandId: '',
-        product_shots: []
+        product_shots: [],
+        default_url: ''
     });
     const [uploading, setUploading] = useState(false);
+    const [capturingScreenshot, setCapturingScreenshot] = useState(false);
     const [saving, setSaving] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -101,6 +103,34 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
         }
     };
 
+    const handleCaptureScreenshot = async () => {
+        setCapturingScreenshot(true);
+        try {
+            const response = await authFetch(`${API_URL}/uploads/screenshot`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: formData.default_url })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Screenshot capture failed' }));
+                throw new Error(errorData.detail || 'Screenshot capture failed');
+            }
+
+            const data = await response.json();
+            setFormData(prev => ({
+                ...prev,
+                product_shots: [...(prev.product_shots || []), data.url]
+            }));
+            showSuccess('Screenshot captured');
+        } catch (err) {
+            console.error('Screenshot capture error:', err);
+            showError(err.message || 'Failed to capture screenshot');
+        } finally {
+            setCapturingScreenshot(false);
+        }
+    };
+
     const removeShot = (index) => {
         setFormData(prev => ({
             ...prev,
@@ -166,6 +196,27 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                     </div>
 
                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Landing Page URL</label>
+                        <input
+                            type="url"
+                            value={formData.default_url || ''}
+                            onChange={e => setFormData({ ...formData, default_url: e.target.value })}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://example.com/signup"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleCaptureScreenshot}
+                            disabled={!formData.default_url || capturingScreenshot}
+                            className="mt-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {capturingScreenshot ? <Loader size={14} className="animate-spin" /> : <Camera size={14} />}
+                            {capturingScreenshot ? 'Capturing...' : 'Capture Screenshot'}
+                        </button>
+                        <p className="text-xs text-gray-500 mt-1">Screenshots the real signup form so generated ads can reference it as a product shot below.</p>
+                    </div>
+
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Product Shots</label>
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             {(formData.product_shots || []).map((shot, index) => (
@@ -211,7 +262,7 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                         </button>
                         <button
                             type="submit"
-                            disabled={saving || uploading}
+                            disabled={saving || uploading || capturingScreenshot}
                             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {saving && <Loader size={16} className="animate-spin" />}

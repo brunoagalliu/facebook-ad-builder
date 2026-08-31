@@ -7,6 +7,7 @@ import { deconstructRequestSchema, reconstructRequestSchema } from "../schemas/a
 import type { AdBlueprint, BrandData } from "../schemas/adBlueprint";
 import { adBlueprintSchema } from "../schemas/adBlueprint";
 import { deconstructTemplate, reconstructAd } from "../services/adRemixService";
+import { deconstructVideoTemplate } from "../services/videoBlueprintService";
 
 // No auth on this router, matching the Python source (ad_remix.py has zero auth deps).
 const router = Router();
@@ -31,6 +32,38 @@ router.post(
       res.json(blueprint);
     } catch (err) {
       res.status(500).json({ detail: `Deconstruction failed: ${(err as Error).message}` });
+    }
+  })
+);
+
+// Manual retry for a video blueprint that failed at promotion time (e.g. a transient
+// Gemini 503) — same idea as /deconstruct above, but for videoUrl/videoBlueprintJson.
+// The WinningAd row itself already exists with its media at that point (promotion
+// doesn't roll back on a blueprint failure), so this just re-runs the analysis step.
+router.post(
+  "/deconstruct-video",
+  validateBody(deconstructRequestSchema),
+  asyncHandler(async (req, res) => {
+    const { template_id } = req.body as { template_id: string };
+    const template = await prisma.winningAd.findUnique({ where: { id: template_id } });
+    if (!template) {
+      res.status(404).json({ detail: "Template not found" });
+      return;
+    }
+    if (!template.videoUrl) {
+      res.status(400).json({ detail: "This template has no video to analyze" });
+      return;
+    }
+
+    try {
+      const blueprint = await deconstructVideoTemplate(template.videoUrl);
+      await prisma.winningAd.update({
+        where: { id: template_id },
+        data: { videoBlueprintJson: blueprint, blueprintAnalyzedAt: new Date() },
+      });
+      res.json(blueprint);
+    } catch (err) {
+      res.status(500).json({ detail: `Video deconstruction failed: ${(err as Error).message}` });
     }
   })
 );

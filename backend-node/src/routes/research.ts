@@ -23,7 +23,7 @@ import {
   searchAdsWithoutSaving,
 } from "../services/researchService";
 import { runScheduledSearches } from "../services/schedulerService";
-import { promoteScrapedAd, promoteTopAdsForVertical } from "../services/winnerPromotionService";
+import { promoteBrandScrapedAd, promoteScrapedAd, promoteTopAdsForVertical } from "../services/winnerPromotionService";
 
 const router = Router();
 
@@ -612,6 +612,24 @@ router.get(
       return;
     }
     res.json({ ...serializeBrandScrape(scrape), ads: scrape.ads.map(serializeBrandScrapedAd) });
+  })
+);
+
+// Manual "mark as winner" for a Brand Scraping result — same idea as
+// /scraped-ads/:scrapedAdId/promote above, but for BrandScrapedAd instead of
+// ScrapedAd.
+router.post(
+  "/brand-scraped-ads/:brandScrapedAdId/promote",
+  requirePermission("templates:write"),
+  asyncHandler(async (req, res) => {
+    try {
+      const promoted = await promoteBrandScrapedAd(req.params.brandScrapedAdId, "manual");
+      res.json(promoted);
+    } catch (err) {
+      const message = (err as Error).message;
+      const status = message.includes("not found") ? 404 : message.includes("already been promoted") ? 400 : 502;
+      res.status(status).json({ detail: message });
+    }
   })
 );
 

@@ -226,6 +226,11 @@ model WinningAd {
   // work; sourceScrapedAdId is unique so the same scraped ad is never promoted twice.
   verticalId            String?   @map("vertical_id")
   sourceScrapedAdId     String?   @unique @map("source_scraped_ad_id")
+  // Same idea as sourceScrapedAdId above, but for ads promoted from the Brand
+  // Scraping feature (BrandScrapedAd) instead of the keyword-search Research feature
+  // (ScrapedAd) — a separate nullable+unique FK rather than reusing sourceScrapedAdId
+  // since the two source tables are unrelated models.
+  sourceBrandScrapedAdId String?  @unique @map("source_brand_scraped_ad_id")
   // The source ad's run_duration_days at promotion time (see researchService.ts's
   // computeRunDurationDays) — lets blueprintSelectionService.ts rank auto-promoted
   // blueprints by strength instead of picking arbitrarily among a vertical's pool.
@@ -242,9 +247,10 @@ model WinningAd {
   videoBlueprintJson    Json?     @map("video_blueprint_json")
   createdAt             DateTime  @default(now()) @map("created_at")
 
-  generatedAds    GeneratedAd[]
-  vertical        Vertical?     @relation(fields: [verticalId], references: [id], onDelete: SetNull)
-  sourceScrapedAd ScrapedAd?    @relation(fields: [sourceScrapedAdId], references: [id], onDelete: SetNull)
+  generatedAds         GeneratedAd[]
+  vertical             Vertical?        @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  sourceScrapedAd      ScrapedAd?       @relation(fields: [sourceScrapedAdId], references: [id], onDelete: SetNull)
+  sourceBrandScrapedAd BrandScrapedAd?  @relation(fields: [sourceBrandScrapedAdId], references: [id], onDelete: SetNull)
 
   @@map("winning_ads")
 }
@@ -468,6 +474,7 @@ model BrandScrapedAd {
   createdAt         DateTime @default(now()) @map("created_at")
 
   brandScrape BrandScrape @relation(fields: [brandScrapeId], references: [id], onDelete: Cascade)
+  winningAd   WinningAd?
 
   @@map("brand_scraped_ads")
 }

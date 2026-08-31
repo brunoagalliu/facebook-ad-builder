@@ -16,9 +16,10 @@ import { randomUUID } from "crypto";
 
 import { prisma } from "../core/prisma";
 import { deconstructTemplate } from "./adRemixService";
-import { extractMediaFromSnapshot } from "./brandScraperService";
+import { extractMediaFromSnapshot, extractTextFromSnapshot } from "./brandScraperService";
 import { computeRunDurationDays } from "./researchService";
 import { uploadFile } from "./storage";
+import { matchVerticalByName } from "./verticalMatchingService";
 import { deconstructVideoTemplate } from "./videoBlueprintService";
 
 const DEFAULT_LIMIT = 3;
@@ -124,6 +125,9 @@ export async function promoteScrapedAd(
   // second image version contributes to both the image- and video-generation blueprint
   // pools instead of one media type silently winning exclusive ownership of the ad.
   try {
+    let videoBlueprint: Awaited<ReturnType<typeof deconstructVideoTemplate>> | undefined;
+    let imageBlueprint: Awaited<ReturnType<typeof deconstructTemplate>> | undefined;
+
     if (videoSrc) {
       // Persisted as soon as the upload succeeds, separately from the blueprint update
       // below — a slow or failing Gemini call shouldn't lose a video that's already
@@ -132,18 +136,33 @@ export async function promoteScrapedAd(
       const uploadedVideoUrl = await downloadAndUploadVideo(videoSrc, ad.id);
       await prisma.winningAd.update({ where: { id: winningAd.id }, data: { videoUrl: uploadedVideoUrl } });
 
-      const videoBlueprint = await deconstructVideoTemplate(uploadedVideoUrl);
+      videoBlueprint = await deconstructVideoTemplate(uploadedVideoUrl);
       await prisma.winningAd.update({
         where: { id: winningAd.id },
         data: { videoBlueprintJson: videoBlueprint, blueprintAnalyzedAt: new Date() },
       });
     }
     if (realImageSrc) {
-      const imageBlueprint = await deconstructTemplate(uploadedImageUrl);
+      imageBlueprint = await deconstructTemplate(uploadedImageUrl);
       await prisma.winningAd.update({
         where: { id: winningAd.id },
         data: { blueprintJson: imageBlueprint, blueprintAnalyzedAt: new Date() },
       });
+    }
+
+    // Only a fallback: this ScrapedAd already has a real, user-chosen vertical from
+    // whichever SavedSearch it came from (set on the WinningAd at create time above)
+    // whenever one exists. Detection only fills the gap for searches that were never
+    // assigned a vertical — it must never overwrite a real one.
+    if (!ad.savedSearch?.verticalId) {
+      const detectedCategory = imageBlueprint?.detected_category ?? videoBlueprint?.detected_category ?? null;
+      if (detectedCategory) {
+        const matched = await matchVerticalByName(detectedCategory);
+        await prisma.winningAd.update({
+          where: { id: winningAd.id },
+          data: { category: detectedCategory, verticalId: matched?.id ?? null },
+        });
+      }
     }
   } catch (err) {
     // The WinningAd row (with its media) still exists — deconstruction can be
@@ -152,6 +171,118 @@ export async function promoteScrapedAd(
   }
 
   return { winning_ad_id: winningAd.id, scraped_ad_id: ad.id, headline: ad.headline, run_duration_days: runDurationDays };
+}
+
+/** Promotes a BrandScrapedAd into a WinningAd blueprint — the Brand Scraping feature's
+ * equivalent of promoteScrapedAd above. Simpler than that pipeline: brandScraperService
+ * already downloads and hosts each ad's media at scrape time (mediaUrls), so there's no
+ * ad-snapshot page to re-scrape here — just classify what's already been uploaded and
+ * hand stable URLs straight to the blueprint deconstructors. */
+export async function promoteBrandScrapedAd(
+  brandScrapedAdId: string,
+  source: "auto" | "manual" = "manual"
+): Promise<PromotionResult["promoted"][number]> {
+  const ad = await prisma.brandScrapedAd.findUnique({
+    where: { id: brandScrapedAdId },
+    include: { winningAd: true, brandScrape: true },
+  });
+  if (!ad) throw new Error("Scraped ad not found");
+  if (ad.winningAd) throw new Error("This ad has already been promoted to a winning ad");
+
+  const mediaUrls = ((ad.mediaUrls as string[] | null) ?? []).filter((url): url is string => typeof url === "string");
+  if (mediaUrls.length === 0) throw new Error("This ad has no downloaded media to promote");
+
+  const isVideoUrl = (url: string) => /\.(mp4|webm|mov)(\?|$)/i.test(url);
+  const videoUrl = mediaUrls.find(isVideoUrl);
+  const imageUrls = mediaUrls.filter((url) => !isVideoUrl(url));
+  // For a video ad, the *last* non-video URL is the poster frame Facebook itself
+  // generates (confirmed live, inspecting the real DOM, that extraction pushes any
+  // background-image/img URLs first and the video's poster last) — earlier entries
+  // can be decorative UI assets, not real creative. Image-only ads have no poster
+  // concept, so the first URL (extraction order of the real creative images) is fine.
+  const realImageUrl = videoUrl ? imageUrls[imageUrls.length - 1] : imageUrls[0];
+  if (!videoUrl && !realImageUrl) throw new Error("No usable image or video found for this ad");
+
+  const brandName = ad.brandScrape?.brandName;
+  const label = source === "auto" ? "Auto-promoted" : "Manually marked as a winner";
+  const notes = `${label} from a brand scrape${brandName ? ` of ${brandName}` : ""}.`;
+
+  const thumbnailUrl = realImageUrl ?? VIDEO_PLACEHOLDER_IMAGE_URL;
+
+  // The bulk list view playwrightScrapeAds reads at scrape time often truncates
+  // before the headline/CTA even render (confirmed live: the same ad's card in the
+  // bulk grid stopped right after the primary text, while its own snapshot page
+  // showed the display URL, headline, and CTA button below the media too). Promoting
+  // an ad is a one-off, deliberate action — same cost tradeoff as promoteScrapedAd's
+  // extractMediaFromSnapshot call above — so it's worth one extra Playwright page
+  // load here to get the complete, correctly-labeled text instead of whatever the
+  // bulk scrape happened to capture. Falls back to the bulk-scraped fields if this
+  // fails, rather than failing the whole promotion.
+  let primaryText = ad.adCopy;
+  let headline = ad.headline;
+  let ctaText = ad.ctaText;
+  if (ad.adLink) {
+    try {
+      const snapshotText = await extractTextFromSnapshot(ad.adLink);
+      if (snapshotText.primaryText) primaryText = snapshotText.primaryText;
+      if (snapshotText.headline) headline = snapshotText.headline;
+      if (snapshotText.ctaText) ctaText = snapshotText.ctaText;
+    } catch (err) {
+      console.error(`Failed to fetch full ad text from snapshot for ${ad.id}:`, err);
+    }
+  }
+
+  const winningAd = await prisma.winningAd.create({
+    data: {
+      name: `${ad.pageName ?? brandName ?? "Unknown"} — ${headline ?? "Untitled"}`.slice(0, 200),
+      imageUrl: thumbnailUrl,
+      headline,
+      bodyText: primaryText,
+      ctaText,
+      mediaType: videoUrl ? "video" : "image",
+      productName: ad.pageName ?? brandName ?? null,
+      notes,
+      sourceBrandScrapedAdId: ad.id,
+    },
+  });
+
+  // Same independent-not-else-if reasoning as promoteScrapedAd above.
+  try {
+    let videoBlueprint: Awaited<ReturnType<typeof deconstructVideoTemplate>> | undefined;
+    let imageBlueprint: Awaited<ReturnType<typeof deconstructTemplate>> | undefined;
+
+    if (videoUrl) {
+      await prisma.winningAd.update({ where: { id: winningAd.id }, data: { videoUrl } });
+      videoBlueprint = await deconstructVideoTemplate(videoUrl);
+      await prisma.winningAd.update({
+        where: { id: winningAd.id },
+        data: { videoBlueprintJson: videoBlueprint, blueprintAnalyzedAt: new Date() },
+      });
+    }
+    if (realImageUrl) {
+      imageBlueprint = await deconstructTemplate(realImageUrl);
+      await prisma.winningAd.update({
+        where: { id: winningAd.id },
+        data: { blueprintJson: imageBlueprint, blueprintAnalyzedAt: new Date() },
+      });
+    }
+
+    // Brand Scraping has no SavedSearch/Vertical concept at all (unlike
+    // promoteScrapedAd above), so this is the only source of a vertical for these
+    // ads — not a fallback.
+    const detectedCategory = imageBlueprint?.detected_category ?? videoBlueprint?.detected_category ?? null;
+    if (detectedCategory) {
+      const matched = await matchVerticalByName(detectedCategory);
+      await prisma.winningAd.update({
+        where: { id: winningAd.id },
+        data: { category: detectedCategory, verticalId: matched?.id ?? null },
+      });
+    }
+  } catch (err) {
+    console.error(`Blueprint deconstruction failed for winning ad ${winningAd.id}:`, err);
+  }
+
+  return { winning_ad_id: winningAd.id, scraped_ad_id: ad.id, headline, run_duration_days: null };
 }
 
 export async function promoteTopAdsForVertical(

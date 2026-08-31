@@ -1,7 +1,7 @@
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Check, Briefcase, Package, Users, Image, Hash, FileText, Sparkles, Download, ChevronDown, ChevronUp, Settings, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Briefcase, Package, Users, Image, Hash, FileText, Sparkles, Download, ChevronDown, ChevronUp, Settings, CheckCircle2, ArrowRight, Wand2 } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import ImageTemplateSelector from '../components/ImageTemplateSelector';
 import BrandSelectionStep from '../components/steps/BrandSelectionStep';
@@ -21,9 +21,15 @@ export default function ImageAds() {
     const [generatedImages, setGeneratedImages] = useState([]);
     const [selectedCopy, setSelectedCopy] = useState(null);
     const [customImagePrompt, setCustomImagePrompt] = useState('');
-    const [templateMode, setTemplateMode] = useState('style'); // 'style' or 'template'
+    const [templateMode, setTemplateMode] = useState('style'); // 'style', 'template', or 'vertical'
     const [autoSuggestedTemplate, setAutoSuggestedTemplate] = useState(null);
     const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+    // "Whole vertical" mode's synthesized meta-blueprint (blueprintSynthesisService.ts)
+    // — separate from autoSuggestedTemplate above since that's a single real WinningAd
+    // auto-picked at random, while this combines the whole pool into one synthesized
+    // result and is only fetched when the user explicitly picks this mode.
+    const [verticalTemplate, setVerticalTemplate] = useState(null);
+    const [loadingVerticalTemplate, setLoadingVerticalTemplate] = useState(false);
 
     // Load saved campaign details from localStorage on mount
     const [wizardData, setWizardData] = useState(() => {
@@ -80,6 +86,21 @@ export default function ImageAds() {
             .catch(() => setAutoSuggestedTemplate(null))
             .finally(() => setLoadingSuggestion(false));
     }, [wizardData.brand?.id, wizardData.brand?.verticalId, authFetch]);
+
+    // "Whole vertical" mode — synthesizes a meta-blueprint across the brand's whole
+    // vertical pool instead of one auto-picked ad (blueprintSynthesisService.ts).
+    // Fetched on demand (when the user picks this mode below), not eagerly like
+    // autoSuggestedTemplate above, since it costs an extra Gemini call server-side.
+    const fetchVerticalTemplate = () => {
+        const brandId = wizardData.brand?.id;
+        if (!brandId) return;
+        setLoadingVerticalTemplate(true);
+        authFetch(`${API_URL}/generated-ads/auto-template?brand_id=${brandId}&mode=vertical`)
+            .then(res => res.ok ? res.json() : null)
+            .then(setVerticalTemplate)
+            .catch(() => setVerticalTemplate(null))
+            .finally(() => setLoadingVerticalTemplate(false));
+    };
 
     const steps = [
         { id: 1, name: 'Brand', icon: Briefcase },
@@ -479,10 +500,30 @@ export default function ImageAds() {
                                     Browse Templates
                                 </div>
                             </button>
+                            {/* Nothing meaningful to synthesize without a vertical assigned —
+                                hidden rather than shown-disabled, matching the auto-suggestion
+                                banner above's same guard. */}
+                            {wizardData.brand?.verticalId && (
+                                <button
+                                    onClick={() => {
+                                        setTemplateMode('vertical');
+                                        if (!verticalTemplate) fetchVerticalTemplate();
+                                    }}
+                                    className={`px-6 py-2 rounded-md font-medium transition-all ${templateMode === 'vertical'
+                                        ? 'bg-white text-amber-600 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Wand2 size={18} />
+                                        Whole Vertical
+                                    </div>
+                                </button>
+                            )}
                         </div>
 
                         {/* Conditional Rendering */}
-                        {templateMode === 'style' ? (
+                        {templateMode === 'style' && (
                             <StyleSelector
                                 onSelect={(style) => {
                                     updateData('template', {
@@ -492,7 +533,8 @@ export default function ImageAds() {
                                     nextStep();
                                 }}
                             />
-                        ) : (
+                        )}
+                        {templateMode === 'template' && (
                             <ImageTemplateSelector
                                 onSelect={(template) => {
                                     updateData('template', {
@@ -504,6 +546,33 @@ export default function ImageAds() {
                                 onClose={() => { }}
                                 embedded={true}
                             />
+                        )}
+                        {templateMode === 'vertical' && (
+                            loadingVerticalTemplate ? (
+                                <div className="text-sm text-gray-500">Synthesizing patterns across this vertical's winning ads…</div>
+                            ) : verticalTemplate ? (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-amber-900 flex items-center gap-1">
+                                            <Wand2 size={14} /> {verticalTemplate.name}
+                                        </p>
+                                        <p className="text-sm text-gray-700">
+                                            Synthesized from {verticalTemplate.source_count} winning ad{verticalTemplate.source_count === 1 ? '' : 's'} in this vertical.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            updateData('template', { type: 'vertical', ...verticalTemplate });
+                                            nextStep();
+                                        }}
+                                        className="flex-shrink-0 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium text-sm"
+                                    >
+                                        Use this
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-gray-500">No analyzed winning ads found in this brand's vertical yet.</div>
+                            )
                         )}
                     </div>
                 )}

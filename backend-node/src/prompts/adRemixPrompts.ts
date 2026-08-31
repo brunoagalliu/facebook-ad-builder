@@ -10,6 +10,7 @@ Analyze this ad image and identify:
 3. How text is organized and prioritized
 4. What psychological triggers make it effective
 5. The overall aesthetic style
+6. The business vertical/niche this ad is for — a short, generic 2-4 word category label (e.g. "Debt relief", "Weight loss supplements", "Solar installation", "Personal injury law"), not the specific brand or product name. Return null if genuinely unclear.
 
 Focus on STRUCTURE, not content. If it's a testosterone ad, describe the "Before/After transformation" pattern, not the hormones themselves.
 
@@ -20,7 +21,8 @@ Return ONLY valid JSON with this exact structure:
   "narrative_arc": "The storytelling sequence (e.g., 'Problem -> Discovery -> Solution -> CTA', 'Question -> Answer -> Proof')",
   "text_hierarchy": "How text is organized (e.g., 'Large question headline at top, bullet points in middle, button at bottom')",
   "psychological_triggers": ["List the triggers", "e.g., Social Proof", "Urgency/Scarcity", "Identity Validation", "Fear of Missing Out"],
-  "visual_style_guide": "The aesthetic vibe (e.g., 'Retro Pop Art with bold colors', 'Minimalist Apple-style', 'UGC Selfie authenticity', 'Comic book illustration')"
+  "visual_style_guide": "The aesthetic vibe (e.g., 'Retro Pop Art with bold colors', 'Minimalist Apple-style', 'UGC Selfie authenticity', 'Comic book illustration')",
+  "detected_category": "A short, generic 2-4 word niche/vertical label (e.g. 'Debt relief'), or null if unclear"
 }
 
 Do NOT include any other text. Return ONLY the JSON object.`;

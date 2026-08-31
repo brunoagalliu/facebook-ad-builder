@@ -1,10 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } from '../api/research';
-import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// media_urls is a flat array of URLs, not tagged by role — extraction order
+// (brandScraperService.ts's playwrightScrapeAds) pushes any background-image/img
+// URLs first, then the video's own src, then its poster frame last. Blindly using
+// media_urls[0] as the <video> source (the original bug here) grabs whatever image
+// came first instead of the actual video — it renders an empty, unplayable player.
+// Classify by file extension instead, and prefer the *last* non-video URL as the
+// cover/poster: confirmed live (via a direct DOM inspection while debugging the
+// scraper) that for a video ad, that last URL is the real representative frame
+// Facebook itself generates, not some earlier decorative/UI asset.
+const isVideoUrl = (url) => /\.(mp4|webm|mov)(\?|$)/i.test(url);
+const classifyAdMedia = (ad) => {
+    const urls = (ad.media_urls || []).filter(Boolean);
+    const videoUrl = urls.find(isVideoUrl);
+    const imageUrls = urls.filter((url) => !isVideoUrl(url));
+    const coverImage = videoUrl ? imageUrls[imageUrls.length - 1] : imageUrls[0];
+    return { videoUrl, imageUrls, coverImage };
+};
 
 const BrandScrapes = () => {
     const { showSuccess, showError, showInfo } = useToast();
+    const { authFetch } = useAuth();
+    const [promotingAdId, setPromotingAdId] = useState(null);
+    const [promotedAdIds, setPromotedAdIds] = useState(new Set());
     const [brandName, setBrandName] = useState('');
     const [pageInput, setPageInput] = useState('');
 
@@ -32,10 +56,20 @@ const BrandScrapes = () => {
     const [scrapeDetails, setScrapeDetails] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [scrapeToDelete, setScrapeToDelete] = useState(null);
+    const [selectedAd, setSelectedAd] = useState(null);
 
     useEffect(() => {
         fetchScrapes();
     }, []);
+
+    useEffect(() => {
+        if (!selectedAd) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setSelectedAd(null);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedAd]);
 
     // scrapeBrand runs as a fire-and-forget background job server-side (see
     // research.ts's POST /brand-scrapes) that can take a minute or more, but nothing
@@ -112,6 +146,23 @@ const BrandScrapes = () => {
         } catch (error) {
             showError('Failed to load scrape details');
             setScrapeDetails(null);
+        }
+    };
+
+    const handlePromoteAd = async (ad) => {
+        setPromotingAdId(ad.id);
+        try {
+            const response = await authFetch(`${API_URL}/research/brand-scraped-ads/${ad.id}/promote`, { method: 'POST' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to mark ad as winner');
+            }
+            setPromotedAdIds(prev => new Set(prev).add(ad.id));
+            showSuccess('Marked as winner — analyzing its structure now. Check Winning Ads shortly.');
+        } catch (error) {
+            showError(error.message || 'Failed to mark ad as winner');
+        } finally {
+            setPromotingAdId(null);
         }
     };
 
@@ -303,105 +354,62 @@ const BrandScrapes = () => {
 
                                         {scrapeDetails.ads && scrapeDetails.ads.length > 0 ? (
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                                {scrapeDetails.ads.map((ad) => (
-                                                    <div
-                                                        key={ad.id}
-                                                        className="bg-white rounded-lg border border-amber-200 overflow-hidden"
-                                                    >
-                                                        {/* Media Preview */}
-                                                        <div className="aspect-video bg-gray-100 relative">
-                                                            {ad.media_urls && ad.media_urls.length > 0 ? (
-                                                                ad.media_type === 'video' ? (
-                                                                    <video
-                                                                        src={ad.media_urls[0]}
-                                                                        className="w-full h-full object-cover"
-                                                                        controls
-                                                                    />
-                                                                ) : (
+                                                {scrapeDetails.ads.map((ad) => {
+                                                    const { coverImage } = classifyAdMedia(ad);
+                                                    return (
+                                                        <div
+                                                            key={ad.id}
+                                                            onClick={() => setSelectedAd(ad)}
+                                                            className="bg-white rounded-lg border border-amber-200 overflow-hidden cursor-pointer hover:shadow-md hover:border-amber-300 transition-shadow"
+                                                        >
+                                                            {/* Cover Image */}
+                                                            <div className="aspect-video bg-gray-100 relative">
+                                                                {coverImage ? (
                                                                     <img
-                                                                        src={ad.media_urls[0]}
+                                                                        src={coverImage}
                                                                         alt={ad.headline || 'Ad'}
                                                                         className="w-full h-full object-cover"
                                                                     />
-                                                                )
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                                    <Image size={32} />
-                                                                </div>
-                                                            )}
-                                                            {ad.media_type && (
-                                                                <span className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
-                                                                    {ad.media_type === 'video' ? (
-                                                                        <Video size={12} className="inline mr-1" />
-                                                                    ) : (
-                                                                        <Image size={12} className="inline mr-1" />
-                                                                    )}
-                                                                    {ad.media_type}
-                                                                </span>
-                                                            )}
-                                                            {ad.media_urls && ad.media_urls.length > 1 && (
-                                                                <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
-                                                                    +{ad.media_urls.length - 1} more
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                        <Image size={32} />
+                                                                    </div>
+                                                                )}
+                                                                {ad.media_type === 'video' && (
+                                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                                                        <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
+                                                                            <Video size={18} className="text-white" />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {ad.media_urls && ad.media_urls.length > 1 && (
+                                                                    <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                                                                        +{ad.media_urls.length - 1} more
+                                                                    </span>
+                                                                )}
+                                                                {promotedAdIds.has(ad.id) && (
+                                                                    <span className="absolute top-2 left-2 px-2 py-0.5 bg-green-600 text-white text-xs rounded font-medium">
+                                                                        ✓ Winner
+                                                                    </span>
+                                                                )}
+                                                            </div>
 
-                                                        {/* Ad Info */}
-                                                        <div className="p-3">
-                                                            {ad.page_name && (
-                                                                <div className="flex items-center gap-1 mb-1">
-                                                                    <span className="text-xs font-medium text-indigo-600 truncate">
+                                                            {/* Minimal Info */}
+                                                            <div className="p-3">
+                                                                {ad.page_name && (
+                                                                    <span className="text-xs font-medium text-indigo-600 truncate block mb-1">
                                                                         {ad.page_name}
                                                                     </span>
-                                                                    {ad.page_link && (
-                                                                        <a
-                                                                            href={ad.page_link}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="text-indigo-400 hover:text-indigo-600 flex-shrink-0"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            title="View all ads from this page"
-                                                                        >
-                                                                            <ExternalLink size={10} />
-                                                                        </a>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            {ad.headline && (
-                                                                <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
-                                                                    {ad.headline}
-                                                                </p>
-                                                            )}
-                                                            {ad.ad_copy && (
-                                                                <p className="text-xs text-gray-500 line-clamp-2 mb-1">
-                                                                    {ad.ad_copy}
-                                                                </p>
-                                                            )}
-                                                            {ad.cta_text && (
-                                                                <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded mb-1">
-                                                                    {ad.cta_text}
-                                                                </span>
-                                                            )}
-                                                            <div className="mt-2 flex items-center justify-between">
-                                                                <span className="text-xs text-gray-400">
-                                                                    {ad.start_date || 'Unknown date'}
-                                                                </span>
-                                                                {ad.ad_link && (
-                                                                    <a
-                                                                        href={ad.ad_link}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-amber-600 hover:text-amber-800"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        title="View ad in library"
-                                                                    >
-                                                                        <ExternalLink size={14} />
-                                                                    </a>
+                                                                )}
+                                                                {ad.headline && (
+                                                                    <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                                                        {ad.headline}
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <div className="text-center py-8 text-gray-500">
@@ -449,6 +457,158 @@ const BrandScrapes = () => {
                             >
                                 Delete
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Ad Details Modal */}
+            {selectedAd && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    onClick={() => setSelectedAd(null)}
+                >
+                    <div
+                        className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-amber-100 sticky top-0 bg-white">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h3 className="font-semibold text-gray-900 truncate">
+                                    {selectedAd.page_name || 'Ad Details'}
+                                </h3>
+                                {selectedAd.page_link && (
+                                    <a
+                                        href={selectedAd.page_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-400 hover:text-indigo-600 flex-shrink-0"
+                                        title="View all ads from this page"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </a>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setSelectedAd(null)}
+                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg flex-shrink-0"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-4">
+                            {(() => {
+                                const { videoUrl, coverImage } = classifyAdMedia(selectedAd);
+                                // Scraped ads are often portrait (Reels/Stories-shaped) — a
+                                // plain w-full would blow a 9:16 video up to the modal's
+                                // full width and make it enormous and mostly off-screen.
+                                // Letterbox it in a fixed-height dark frame instead, capped
+                                // by height so portrait and landscape media both fit.
+                                if (videoUrl) {
+                                    return (
+                                        <div className="bg-gray-900 rounded-lg flex items-center justify-center overflow-hidden">
+                                            <video
+                                                src={videoUrl}
+                                                poster={coverImage}
+                                                className="max-h-[50vh] max-w-full"
+                                                controls
+                                                autoPlay
+                                            />
+                                        </div>
+                                    );
+                                }
+                                if (coverImage) {
+                                    return (
+                                        <div className="bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                                            <img
+                                                src={coverImage}
+                                                alt={selectedAd.headline || 'Ad'}
+                                                className="max-h-[50vh] max-w-full"
+                                            />
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                                        <Image size={32} />
+                                    </div>
+                                );
+                            })()}
+
+                            <div className="space-y-3">
+                                {selectedAd.ad_copy && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                                            Primary Text
+                                        </p>
+                                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedAd.ad_copy}</p>
+                                    </div>
+                                )}
+                                {selectedAd.headline && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                                            Headline
+                                        </p>
+                                        <p className="text-sm font-medium text-gray-900">{selectedAd.headline}</p>
+                                    </div>
+                                )}
+                                {selectedAd.cta_text && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                                            Call to Action
+                                        </p>
+                                        <span className="inline-block px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded font-medium">
+                                            {selectedAd.cta_text}
+                                        </span>
+                                    </div>
+                                )}
+                                {selectedAd.platforms && selectedAd.platforms.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+                                            Platforms
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {selectedAd.platforms.map((platform) => (
+                                                <span
+                                                    key={platform}
+                                                    className="inline-block px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded capitalize"
+                                                >
+                                                    {platform}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-100">
+                                <span>{selectedAd.start_date || 'Unknown date'}</span>
+                                {selectedAd.ad_link && (
+                                    <a
+                                        href={selectedAd.ad_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-amber-600 hover:text-amber-800"
+                                    >
+                                        View in Ad Library <ExternalLink size={12} />
+                                    </a>
+                                )}
+                            </div>
+
+                            {promotedAdIds.has(selectedAd.id) ? (
+                                <span className="block text-center px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium text-sm">
+                                    ✓ Marked as Winner
+                                </span>
+                            ) : (
+                                <button
+                                    onClick={() => handlePromoteAd(selectedAd)}
+                                    disabled={promotingAdId === selectedAd.id}
+                                    className="w-full px-3 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {promotingAdId === selectedAd.id ? 'Marking...' : '★ Mark as Winner'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

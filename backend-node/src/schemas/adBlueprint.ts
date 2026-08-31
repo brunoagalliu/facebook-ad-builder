@@ -6,6 +6,12 @@ export const adBlueprintSchema = z.object({
   text_hierarchy: z.string(),
   psychological_triggers: z.array(z.string()),
   visual_style_guide: z.string(),
+  // Optional/tolerant, unlike every field above — this is a freeform-text Gemini
+  // response with no responseSchema/structured-output config, parsed after the fact
+  // via extractJsonFromText + this schema's .parse(). Making the one genuinely-new
+  // field strict would mean an occasional Gemini omission (or an unexpected type)
+  // nukes the whole blueprint parse instead of just leaving categorization unset.
+  detected_category: z.string().nullable().catch(null),
 });
 export type AdBlueprint = z.infer<typeof adBlueprintSchema>;
 

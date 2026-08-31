@@ -15,6 +15,7 @@ const nestedProductSchema = z.object({
   name: z.string(),
   description: z.string().nullish(),
   product_shots: z.array(z.string()).optional().default([]),
+  default_url: z.string().nullish(),
 });
 
 export const brandCreateSchema = z.object({

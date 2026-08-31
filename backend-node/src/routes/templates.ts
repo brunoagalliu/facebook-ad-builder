@@ -57,11 +57,12 @@ router.get(
   "",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { search, category, style, vertical } = req.query as {
+    const { search, category, style, vertical, media_type: mediaType } = req.query as {
       search?: string;
       category?: string;
       style?: string;
       vertical?: string;
+      media_type?: string;
     };
 
     const where: Record<string, unknown> = {};
@@ -72,6 +73,10 @@ router.get(
     // niche it was scraped under (WinningAd.category, e.g. "Debt relief"), populated at
     // promotion time from the source scraped ad's search's vertical.
     if (vertical) where.category = vertical;
+    // Lets a manual template picker scope to video-capable templates only — added for
+    // VideoAds.jsx's single-ad mode (reuses ImageTemplateSelector, which already
+    // renders a video badge for these but had no way to filter down to just them).
+    if (mediaType) where.mediaType = mediaType;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

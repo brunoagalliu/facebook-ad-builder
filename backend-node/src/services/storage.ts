@@ -39,8 +39,9 @@ export async function uploadToR2(content: Buffer, filename: string, contentType:
 }
 
 export async function uploadToLocal(content: Buffer, filename: string): Promise<string> {
-  await fs.mkdir(uploadsDir, { recursive: true });
-  await fs.writeFile(path.join(uploadsDir, filename), content);
+  const destination = path.join(uploadsDir, filename);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, content);
   // Absolute, not relative — the frontend is on a different origin than this API,
   // so a bare "/uploads/..." path would resolve against the frontend's own origin
   // in the browser and 404. R2 already returns absolute URLs; this matches that.

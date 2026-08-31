@@ -11,8 +11,14 @@ import { settings } from "../core/config";
 import { VIDEO_DECONSTRUCTION_PROMPT } from "../prompts/videoBlueprintPrompts";
 import { VideoBlueprint, videoBlueprintSchema } from "../schemas/videoBlueprint";
 import { extractJsonFromText } from "../utils/json";
+import { withTransientRetry } from "../utils/retry";
 
-const MODEL = "gemini-flash-latest";
+// Pinned, not the "-latest" alias — confirmed live that the alias itself can be the
+// unreliable part (sustained 503 "high demand" on every request, including a trivial
+// text-only one hitting the API directly) while this exact version, and real video
+// input against it, both worked immediately. See adRemixService.ts's MODEL comment
+// for the same finding and what to do if this version eventually gets deprecated.
+const MODEL = "gemini-3.6-flash";
 
 // Gemini's inline generateContent request must stay under ~20MB total; base64 adds
 // ~33% overhead, so the raw file needs real headroom under that. Our own
@@ -56,7 +62,7 @@ export async function deconstructVideoTemplate(videoUrl: string): Promise<VideoB
     const model = getClient().getGenerativeModel({ model: MODEL });
     const { mimeType, data } = await fetchVideoAsBase64(videoUrl);
 
-    const result = await model.generateContent([VIDEO_DECONSTRUCTION_PROMPT, { inlineData: { mimeType, data } }]);
+    const result = await withTransientRetry(() => model.generateContent([VIDEO_DECONSTRUCTION_PROMPT, { inlineData: { mimeType, data } }]));
     const blueprintData = extractJsonFromText(result.response.text());
     return videoBlueprintSchema.parse(blueprintData);
   } catch (err) {

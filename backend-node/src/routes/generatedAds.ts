@@ -7,7 +7,10 @@ import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
 import { videoGenerationRequestSchema } from "../schemas/videoGeneration";
-import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
+import { AdBlueprint } from "../schemas/adBlueprint";
+import { VideoBlueprint } from "../schemas/videoBlueprint";
+import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
+import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "../services/blueprintSynthesisService";
 import { generateImages } from "../services/imageGenerationService";
 import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
 import { serialize as serializeWinningAd } from "./templates";
@@ -30,11 +33,37 @@ router.post(
   })
 );
 
+// A synthesized meta-blueprint (blueprintSynthesisService.ts) isn't a real persisted
+// WinningAd row, so it can't go through templates.ts's serialize() — this covers just
+// the fields the frontend's template consumers (ImageAds.jsx/VideoAds.jsx) actually
+// read (blueprint_json/video_blueprint_json/media_type), plus source_count so the UI
+// can show "synthesized from N winning ads".
+function serializeSynthesizedBlueprint(
+  verticalId: string,
+  verticalName: string,
+  mediaType: "image" | "video",
+  blueprint: AdBlueprint | VideoBlueprint,
+  sourceCount: number
+) {
+  return {
+    id: `synthesis:${verticalId}:${mediaType}`,
+    name: `${verticalName} — Vertical Blueprint (${sourceCount} ads)`,
+    image_url: null,
+    media_type: mediaType,
+    blueprint_json: mediaType === "image" ? blueprint : null,
+    video_blueprint_json: mediaType === "video" ? blueprint : null,
+    source_count: sourceCount,
+  };
+}
+
 // Auto-picks the best-fitting WinningAd blueprint for a brand's vertical
 // (blueprintSelectionService.ts) — lets the wizard pre-fill a template instead of
 // forcing the user through manual browsing every time. Returns null (not 404) when
 // the brand has no vertical or the vertical has no analyzed blueprints yet — this is
-// an optional smart default, not a required lookup.
+// an optional smart default, not a required lookup. mode=vertical instead synthesizes
+// a meta-blueprint across the whole vertical's pool (blueprintSynthesisService.ts) —
+// default mode=auto keeps today's single-random-pick behavior, fully backward
+// compatible for any existing caller that doesn't send a mode.
 router.get(
   "/auto-template",
   requireAuth,
@@ -42,6 +71,21 @@ router.get(
     const brandId = req.query.brand_id as string | undefined;
     if (!brandId) {
       res.status(422).json({ detail: "brand_id is required" });
+      return;
+    }
+    if (req.query.mode === "vertical") {
+      const brand = await prisma.brand.findUnique({ where: { id: brandId }, include: { vertical: true } });
+      if (!brand?.verticalId || !brand.vertical) {
+        res.json(null);
+        return;
+      }
+      const [blueprint, candidates] = await Promise.all([
+        synthesizeVerticalImageBlueprint(brand.verticalId),
+        getCandidateBlueprintsForVertical(brand.verticalId, "image"),
+      ]);
+      res.json(
+        blueprint ? serializeSynthesizedBlueprint(brand.verticalId, brand.vertical.name, "image", blueprint, candidates.length) : null
+      );
       return;
     }
     const blueprint = await selectBlueprintForBrand(brandId);
@@ -52,7 +96,8 @@ router.get(
 // Video counterpart of the above — createVideoTask already calls
 // selectVideoBlueprintForBrand internally to steer generation, but that pick was never
 // exposed to the frontend, so the wizard had no way to show or pull from it (unlike
-// the image wizard's auto-suggested template). Same "return null, not 404" contract.
+// the image wizard's auto-suggested template). Same "return null, not 404" contract,
+// same mode=vertical extension.
 router.get(
   "/auto-video-template",
   requireAuth,
@@ -60,6 +105,21 @@ router.get(
     const brandId = req.query.brand_id as string | undefined;
     if (!brandId) {
       res.status(422).json({ detail: "brand_id is required" });
+      return;
+    }
+    if (req.query.mode === "vertical") {
+      const brand = await prisma.brand.findUnique({ where: { id: brandId }, include: { vertical: true } });
+      if (!brand?.verticalId || !brand.vertical) {
+        res.json(null);
+        return;
+      }
+      const [blueprint, candidates] = await Promise.all([
+        synthesizeVerticalVideoBlueprint(brand.verticalId),
+        getCandidateBlueprintsForVertical(brand.verticalId, "video"),
+      ]);
+      res.json(
+        blueprint ? serializeSynthesizedBlueprint(brand.verticalId, brand.vertical.name, "video", blueprint, candidates.length) : null
+      );
       return;
     }
     const blueprint = await selectVideoBlueprintForBrand(brandId);

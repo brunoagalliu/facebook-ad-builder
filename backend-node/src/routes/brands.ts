@@ -98,6 +98,7 @@ router.post(
             name: p.name,
             description: p.description,
             productShots: p.product_shots,
+            defaultUrl: p.default_url,
           },
         });
       }
@@ -152,7 +153,7 @@ router.put(
           incomingIds.add(p.id);
           await tx.product.update({
             where: { id: p.id },
-            data: { name: p.name, description: p.description, productShots: p.product_shots },
+            data: { name: p.name, description: p.description, productShots: p.product_shots, defaultUrl: p.default_url },
           });
         } else if (p.id) {
           // Product exists elsewhere (or not at all) — reassign it to this brand, or create it.
@@ -161,16 +162,29 @@ router.put(
           if (other) {
             await tx.product.update({
               where: { id: p.id },
-              data: { brandId, name: p.name, description: p.description, productShots: p.product_shots },
+              data: {
+                brandId,
+                name: p.name,
+                description: p.description,
+                productShots: p.product_shots,
+                defaultUrl: p.default_url,
+              },
             });
           } else {
             await tx.product.create({
-              data: { id: p.id, brandId, name: p.name, description: p.description, productShots: p.product_shots },
+              data: {
+                id: p.id,
+                brandId,
+                name: p.name,
+                description: p.description,
+                productShots: p.product_shots,
+                defaultUrl: p.default_url,
+              },
             });
           }
         } else {
           const created = await tx.product.create({
-            data: { brandId, name: p.name, description: p.description, productShots: p.product_shots },
+            data: { brandId, name: p.name, description: p.description, productShots: p.product_shots, defaultUrl: p.default_url },
           });
           incomingIds.add(created.id);
         }

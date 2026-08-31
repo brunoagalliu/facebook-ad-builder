@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 
 import { settings } from "../core/config";
 import { prisma } from "../core/prisma";
-import { deleteFromR2, uploadToR2 } from "./storage";
+import { deleteFromR2, uploadFile } from "./storage";
 
 const GRAPH_BASE_URL = "https://graph.facebook.com/v21.0/ads_archive";
 const USER_AGENT =
@@ -178,16 +178,50 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
 
     const ads = (await page.evaluate(() => {
       const results: Record<string, unknown>[] = [];
-      const seenIds = new Set<string>();
 
+      // querySelectorAll("div") returns elements in document order — ancestors before
+      // their descendants — and every ancestor of an ad card's own div also has
+      // "Library ID: X" somewhere in its innerText (text propagates upward through
+      // nested divs). Taking the *first* match per ID therefore grabbed a huge outer
+      // container (in one live check: 7974 descendant divs, every image/video from
+      // every ad on the page) instead of that ad's own card, for whichever ad happened
+      // to be first in the DOM. Taking the plain *smallest* match overcorrects the other
+      // way: the innermost div containing that text is often just a tiny label wrapper
+      // around "Library ID: X" itself (confirmed live: textLen 28, 0 img/video
+      // descendants) — the media lives in a sibling branch of the card, not inside it.
+      // The fix is the smallest matching div that still has at least one relevant
+      // img/video descendant — confirmed live this lands on each ad's own card (~400-500
+      // char text, exactly 1 img + 1 video) for all 27/27 ads on a real test page. Falls
+      // back to the smallest match with no media requirement so a genuine text-only ad
+      // (no image/video at all) still gets captured for its copy, rather than silently
+      // dropped.
+      const bestWithMedia = new Map<string, { div: Element; textLen: number }>();
+      const bestAny = new Map<string, { div: Element; textLen: number }>();
       document.querySelectorAll("div").forEach((div) => {
         const text = (div as HTMLElement).innerText || "";
         const idMatch = text.match(/Library ID:\s*(\d+)/);
         if (!idMatch) return;
-
         const libraryId = idMatch[1];
-        if (seenIds.has(libraryId)) return;
-        seenIds.add(libraryId);
+
+        const existingAny = bestAny.get(libraryId);
+        if (!existingAny || text.length < existingAny.textLen) {
+          bestAny.set(libraryId, { div, textLen: text.length });
+        }
+
+        const hasMedia = div.querySelector('img[src*="scontent"], img[src*="fbcdn"], video') !== null;
+        if (!hasMedia) return;
+        const existingWithMedia = bestWithMedia.get(libraryId);
+        if (!existingWithMedia || text.length < existingWithMedia.textLen) {
+          bestWithMedia.set(libraryId, { div, textLen: text.length });
+        }
+      });
+      const candidatesByLibraryId = new Map<string, { div: Element; textLen: number }>();
+      bestAny.forEach((value, libraryId) => {
+        candidatesByLibraryId.set(libraryId, bestWithMedia.get(libraryId) ?? value);
+      });
+
+      candidatesByLibraryId.forEach(({ div }, libraryId) => {
+        const text = (div as HTMLElement).innerText || "";
 
         let pageName: string | null = null;
         const sponsoredIdx = text.indexOf("Sponsored");
@@ -199,21 +233,39 @@ async function playwrightScrapeAds(query: string, limit: number, isSearch: boole
           if (before.length) pageName = before[before.length - 1].trim();
         }
 
-        let headline: string | null = null;
         let adCopy: string | null = null;
-        let ctaText: string | null = null;
+        let headline: string | null = null;
         const lines = text
           .split("\n")
           .map((l) => l.trim())
           .filter((l) => l);
+        // A Facebook link ad's text, in reading order, is: primary text (the long body
+        // copy above the media), then — after the media — a display URL, a short bold
+        // headline, and finally a CTA button. Two things were confirmed live against a
+        // real ad's own single-ad snapshot page: (1) the video player's elapsed/duration
+        // readout ("0:00 / 0:18") is real visible text long enough to pass the ">10
+        // chars" heuristic below, and (2) the plain display URL ("HTTP://EXAMPLE.COM/")
+        // does too — both were getting mistaken for real copy. Skip both. Note the bulk
+        // list view scraped here often truncates before the headline even renders (also
+        // confirmed live, comparing the same ad's card here against its own snapshot
+        // page) — promoteBrandScrapedAd re-fetches the full text from that page at
+        // promotion time rather than trusting this alone.
+        const isVideoTimestamp = (line: string) => /^\d{1,2}:\d{2}(\s*\/\s*\d{1,2}:\d{2})?$/.test(line);
+        const isDisplayUrl = (line: string) => /^https?:\/\//i.test(line) || /^[a-z0-9-]+\.[a-z]{2,}\/?$/i.test(line);
         const sponsoredLine = lines.findIndex((l) => l === "Sponsored");
         if (sponsoredLine >= 0) {
           for (let i = sponsoredLine + 1; i < lines.length; i++) {
             if (lines[i].includes("Library ID")) break;
-            if (!headline && lines[i].length > 10) headline = lines[i];
-            else if (headline && lines[i].length > 10 && !adCopy) adCopy = lines[i];
+            if (isVideoTimestamp(lines[i]) || isDisplayUrl(lines[i])) continue;
+            // The first long line is the primary text (the body copy shown above the
+            // media); the next one, if the card renders far enough, is the headline
+            // from the link-preview card below the media.
+            if (!adCopy && lines[i].length > 10) adCopy = lines[i];
+            else if (adCopy && lines[i].length > 10 && !headline) headline = lines[i];
           }
         }
+
+        let ctaText: string | null = null;
 
         const ctaPatterns = ["Learn More", "Shop Now", "Sign Up", "Get Offer", "Book Now", "Download", "Apply Now", "Subscribe"];
         for (const cta of ctaPatterns) {
@@ -351,6 +403,65 @@ export async function extractMediaFromSnapshot(snapshotUrl: string): Promise<Sna
   return result;
 }
 
+export interface SnapshotText {
+  primaryText: string | null;
+  headline: string | null;
+  ctaText: string | null;
+}
+
+/** Re-fetches an ad's own single-ad snapshot page for its full text. The bulk list
+ * view playwrightScrapeAds reads often truncates before the headline/CTA even
+ * render — confirmed live that the same ad's card in the bulk grid stopped right
+ * after the primary text, while its own snapshot page (this function's target) showed
+ * the display URL, headline, and CTA button below the media too. Deliberately used at
+ * promotion time only (same reasoning as extractMediaFromSnapshot above) rather than
+ * for every scraped ad, to avoid an extra Playwright page load per ad during a bulk
+ * scrape. */
+export async function extractTextFromSnapshot(snapshotUrl: string): Promise<SnapshotText> {
+  let result: SnapshotText = { primaryText: null, headline: null, ctaText: null };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ userAgent: USER_AGENT });
+    const page = await context.newPage();
+    await page.goto(snapshotUrl, { timeout: 30_000, waitUntil: "networkidle" });
+
+    result = await page.evaluate(() => {
+      const text = document.body.innerText || "";
+      const lines = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l);
+      const isVideoTimestamp = (line: string) => /^\d{1,2}:\d{2}(\s*\/\s*\d{1,2}:\d{2})?$/.test(line);
+      const isDisplayUrl = (line: string) => /^https?:\/\//i.test(line) || /^[a-z0-9-]+\.[a-z]{2,}\/?$/i.test(line);
+      const sponsoredLine = lines.findIndex((l) => l === "Sponsored");
+      let primaryText: string | null = null;
+      let headline: string | null = null;
+      if (sponsoredLine >= 0) {
+        for (let i = sponsoredLine + 1; i < lines.length; i++) {
+          if (lines[i].includes("Library ID")) break;
+          if (isVideoTimestamp(lines[i]) || isDisplayUrl(lines[i])) continue;
+          if (!primaryText && lines[i].length > 10) primaryText = lines[i];
+          else if (primaryText && lines[i].length > 10 && !headline) headline = lines[i];
+        }
+      }
+      const ctaPatterns = ["Learn More", "Shop Now", "Sign Up", "Get Offer", "Book Now", "Download", "Apply Now", "Subscribe"];
+      let ctaText: string | null = null;
+      for (const cta of ctaPatterns) {
+        if (text.includes(cta)) {
+          ctaText = cta;
+          break;
+        }
+      }
+      return { primaryText, headline, ctaText };
+    });
+  } catch (err) {
+    console.error("Error extracting text from snapshot:", err);
+  } finally {
+    await browser.close();
+  }
+  return result;
+}
+
 function extensionAndTypeForUrl(mediaUrl: string): { ext: string; mediaType: "video" | "image" } {
   const lower = mediaUrl.toLowerCase();
   if ([".mp4", ".webm", ".mov"].some((e) => lower.includes(e))) return { ext: ".mp4", mediaType: "video" };
@@ -373,7 +484,7 @@ async function downloadAndUploadMedia(
     if (content.length < 1000) return { url: null, mediaType };
 
     const filename = `${folderName}/${adId}_${index}${ext}`;
-    const url = await uploadToR2(content, filename, mediaType === "video" ? "video/mp4" : "image/jpeg");
+    const url = await uploadFile(content, filename, mediaType === "video" ? "video/mp4" : "image/jpeg");
     return { url, mediaType };
   } catch (err) {
     console.error("Download/upload error:", err);
@@ -381,9 +492,9 @@ async function downloadAndUploadMedia(
   }
 }
 
-async function processAd(adData: RawAd, brandScrapeId: string, folderName: string): Promise<void> {
+async function processAd(adData: RawAd, brandScrapeId: string, folderName: string): Promise<number> {
   const adId = adData.id;
-  if (!adId) return;
+  if (!adId) return 0;
 
   const headline = adData.ad_creative_link_titles?.[0] ?? null;
   const adCopy = adData.ad_creative_bodies?.[0] ?? null;
@@ -402,7 +513,7 @@ async function processAd(adData: RawAd, brandScrapeId: string, folderName: strin
         const isVideo = mediaItem.content_type.includes("video");
         const ext = isVideo ? ".mp4" : mediaItem.content_type.includes("png") ? ".png" : mediaItem.content_type.includes("webp") ? ".webp" : ".jpg";
         const filename = `${folderName}/${adId}_${i}${ext}`;
-        const url = await uploadToR2(mediaItem.data, filename, mediaItem.content_type);
+        const url = await uploadFile(mediaItem.data, filename, mediaItem.content_type);
         r2Urls.push(url);
         if (isVideo) mediaType = "video";
       } catch (err) {
@@ -455,6 +566,8 @@ async function processAd(adData: RawAd, brandScrapeId: string, folderName: strin
       adLink: `https://www.facebook.com/ads/library/?id=${adId}`,
     },
   });
+
+  return r2Urls.length;
 }
 
 export async function scrapeBrand(brandScrapeId: string): Promise<void> {
@@ -479,8 +592,7 @@ export async function scrapeBrand(brandScrapeId: string): Promise<void> {
     let mediaCount = 0;
     for (const adData of adsData) {
       try {
-        await processAd(adData, brandScrapeId, folderName);
-        mediaCount += adData._media_data?.length ?? 0;
+        mediaCount += await processAd(adData, brandScrapeId, folderName);
       } catch (err) {
         console.error(`Error processing ad ${adData.id}:`, err);
       }
