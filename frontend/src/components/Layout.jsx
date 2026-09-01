@@ -67,13 +67,13 @@ export default function Layout() {
 
                 <div className={`p-6 border-b border-amber-100 ${isCollapsed ? 'px-4' : ''}`}>
                     <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0">
-                            <img src="/breadwinner_logo.png" alt="BreadWinner Logo" className="w-full h-full object-cover" />
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0 p-1">
+                            <img src="/unwavering_logo.png" alt="UnwaveringMedia Logo" className="w-full h-full object-contain" />
                         </div>
                         {!isCollapsed && (
                             <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold text-amber-900">BreadWinner</h1>
-                                <p className="text-xs text-amber-600">Fresh campaigns daily</p>
+                                <h1 className="text-xl font-bold text-amber-900">Unwavering</h1>
+                                <p className="text-xs text-amber-600">AI-Powered Ad Automation</p>
                             </div>
                         )}
                     </div>

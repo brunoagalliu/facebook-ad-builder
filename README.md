@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="frontend/public/breadwinner_logo.png" alt="BreadWinner" width="120" />
+  <img src="frontend/public/unwavering_logo.png" alt="UnwaveringMedia" width="280" />
 </p>
 
-<h1 align="center">BreadWinner</h1>
+<h1 align="center">UnwaveringMedia Ad Automation</h1>
 
 <p align="center">
   <strong>AI-powered Facebook ad automation platform</strong><br>
@@ -27,7 +27,7 @@
 
 ## Overview
 
-BreadWinner takes a Facebook ad from "what's working for competitors" to "live in Ads Manager," with AI doing the heavy lifting at every stage in between. Scrape real competitor ads (either by keyword search against Meta's Ad Library API, or by pointing at a specific competitor's Facebook Page and letting a headless browser pull their whole archive), have Gemini deconstruct what's structurally winning about them into a reusable blueprint, then generate new on-brand ad copy, images, and video from those blueprints — choosing a single reference ad or a synthesized pattern learned across an entire niche. Push the result straight into a Facebook campaign, or export it.
+UnwaveringMedia's ad automation platform takes a Facebook ad from "what's working for competitors" to "live in Ads Manager," with AI doing the heavy lifting at every stage in between. Scrape real competitor ads (either by keyword search against Meta's Ad Library API, or by pointing at a specific competitor's Facebook Page and letting a headless browser pull their whole archive), have Gemini deconstruct what's structurally winning about them into a reusable blueprint, then generate new on-brand ad copy, images, and video from those blueprints — choosing a single reference ad or a synthesized pattern learned across an entire niche. Push the result straight into a Facebook campaign, or export it.
 
 ### Key Capabilities
 
