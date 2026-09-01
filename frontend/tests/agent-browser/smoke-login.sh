@@ -11,7 +11,7 @@ sleep 2
 # Get snapshot and verify elements exist
 SNAPSHOT=$(agent-browser snapshot)
 
-if echo "$SNAPSHOT" | grep -q "email"; then
+if echo "$SNAPSHOT" | grep -qi "email"; then
   echo "✓ Email input found"
 else
   echo "✗ Email input not found"
@@ -20,7 +20,7 @@ else
   exit 1
 fi
 
-if echo "$SNAPSHOT" | grep -q "password"; then
+if echo "$SNAPSHOT" | grep -qi "password"; then
   echo "✓ Password input found"
 else
   echo "✗ Password input not found"
