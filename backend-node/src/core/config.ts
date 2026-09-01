@@ -38,6 +38,11 @@ export const settings = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
   FAL_AI_API_KEY: process.env.FAL_AI_API_KEY ?? "",
+  // Fal.ai splits keys into "API" scope (generation, model discovery — what
+  // FAL_AI_API_KEY normally is) and "Admin" scope (account/billing endpoints).
+  // A regular API-scope key 403s on the billing balance check, so that lookup needs
+  // its own separate, more-sensitive admin key rather than reusing the generation one.
+  FAL_AI_ADMIN_KEY: process.env.FAL_AI_ADMIN_KEY ?? "",
   KIE_AI_API_KEY: process.env.KIE_AI_API_KEY ?? "",
 
   FACEBOOK_ACCESS_TOKEN: process.env.FACEBOOK_ACCESS_TOKEN ?? process.env.VITE_FACEBOOK_ACCESS_TOKEN ?? "",

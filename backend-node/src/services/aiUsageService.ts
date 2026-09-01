@@ -31,12 +31,15 @@ export async function getKieBalance(): Promise<ProviderBalance> {
 }
 
 export async function getFalBalance(): Promise<ProviderBalance> {
-  if (!settings.FAL_AI_API_KEY) {
-    return { provider: "fal", balance: null, unit: "usd", error: "FAL_AI_API_KEY not configured" };
+  // The billing endpoint requires an Admin-scope key — the regular FAL_AI_API_KEY
+  // used for generation is API-scoped and 403s here (confirmed live).
+  const key = settings.FAL_AI_ADMIN_KEY || settings.FAL_AI_API_KEY;
+  if (!key) {
+    return { provider: "fal", balance: null, unit: "usd", error: "FAL_AI_ADMIN_KEY not configured" };
   }
   try {
     const response = await fetch("https://api.fal.ai/v1/account/billing?expand=credits", {
-      headers: { Authorization: `Key ${settings.FAL_AI_API_KEY}` },
+      headers: { Authorization: `Key ${key}` },
     });
     if (!response.ok) {
       return { provider: "fal", balance: null, unit: "usd", error: `status ${response.status}` };
