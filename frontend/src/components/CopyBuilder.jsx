@@ -38,14 +38,14 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Step 1: Create Ad Copy</h2>
+            <h2 className="text-2xl font-bold text-ink">Step 1: Create Ad Copy</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+                    <label className="block text-sm font-medium text-ink-secondary mb-2">Product Name</label>
                     {activeBrand?.products?.length > 0 ? (
                         <select
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             value={data.productName}
                             onChange={(e) => updateData('productName', e.target.value)}
                         >
@@ -59,7 +59,7 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
                     ) : (
                         <input
                             type="text"
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., Glow Serum"
                             value={data.productName}
                             onChange={(e) => updateData('productName', e.target.value)}
@@ -67,10 +67,10 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
                     )}
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Target Audience</label>
+                    <label className="block text-sm font-medium text-ink-secondary mb-2">Target Audience</label>
                     <input
                         type="text"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="e.g., Skincare enthusiasts"
                         value={data.targetAudience}
                         onChange={(e) => updateData('targetAudience', e.target.value)}
@@ -83,7 +83,7 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
                     onClick={handleGenerateCopy}
                     disabled={isGenerating || !data.productName}
                     className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${isGenerating || !data.productName
-                        ? 'bg-gray-400 cursor-not-allowed'
+                        ? 'bg-ink-tertiary cursor-not-allowed'
                         : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-lg transform hover:-translate-y-0.5'
                         }`}
                 >
@@ -92,10 +92,10 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
             </div>
 
             {data.generatedCopy && (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 animate-fade-in">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Generated Copy</label>
+                <div className="bg-surface-hover p-4 rounded-lg border border-border animate-fade-in">
+                    <label className="block text-sm font-medium text-ink-secondary mb-2">Generated Copy</label>
                     <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg bg-white"
+                        className="w-full p-3 border border-border rounded-lg bg-surface"
                         rows="3"
                         value={data.generatedCopy}
                         onChange={(e) => updateData('generatedCopy', e.target.value)}
@@ -108,7 +108,7 @@ const CopyBuilder = ({ data, setData, onNext, brandVoice, activeBrand }) => {
                     onClick={onNext}
                     disabled={!data.generatedCopy}
                     className={`px-8 py-3 rounded-lg font-semibold transition-colors ${!data.generatedCopy
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        ? 'bg-border text-ink-tertiary cursor-not-allowed'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                 >

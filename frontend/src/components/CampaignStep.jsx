@@ -134,8 +134,8 @@ const CampaignStep = ({ onNext, onBack }) => {
                         }));
                     }}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${mode === 'new'
-                        ? 'border-amber-600 bg-amber-50'
-                        : 'border-gray-200 hover:border-amber-300'
+                        ? 'border-brand-600 bg-brand-50'
+                        : 'border-border hover:border-brand-300'
                         }`}
                 >
                     <Plus className="mx-auto mb-2" size={24} />
@@ -144,8 +144,8 @@ const CampaignStep = ({ onNext, onBack }) => {
                 <button
                     onClick={() => setMode('existing')}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${mode === 'existing'
-                        ? 'border-amber-600 bg-amber-50'
-                        : 'border-gray-200 hover:border-amber-300'
+                        ? 'border-brand-600 bg-brand-50'
+                        : 'border-border hover:border-brand-300'
                         }`}
                 >
                     <Check className="mx-auto mb-2" size={24} />
@@ -158,37 +158,37 @@ const CampaignStep = ({ onNext, onBack }) => {
                 <div className="space-y-4 mb-6">
                     {/* Existing Campaigns */}
                     <div>
-                        <h3 className="font-semibold text-gray-700 mb-3">Select a Campaign</h3>
+                        <h3 className="font-semibold text-ink-secondary mb-3">Select a Campaign</h3>
                         {loadingCampaigns ? (
-                            <div className="flex items-center justify-center gap-2 text-gray-500 py-8">
+                            <div className="flex items-center justify-center gap-2 text-ink-tertiary py-8">
                                 <Loader className="animate-spin" size={20} />
                                 <span>Loading campaigns from Facebook...</span>
                             </div>
                         ) : existingCampaigns.length === 0 ? (
-                            <p className="text-gray-500 text-center py-8">No campaigns found in this ad account.</p>
+                            <p className="text-ink-tertiary text-center py-8">No campaigns found in this ad account.</p>
                         ) : (
                             existingCampaigns.map(campaign => (
                                 <div
                                     key={campaign.id}
                                     onClick={() => handleSelectExisting(campaign)}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all mb-2 ${selectedCampaign?.id === campaign.id
-                                        ? 'border-amber-600 bg-amber-50'
-                                        : 'border-gray-200 hover:border-amber-300'
+                                        ? 'border-brand-600 bg-brand-50'
+                                        : 'border-border hover:border-brand-300'
                                         }`}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="font-bold text-gray-900">{campaign.name}</div>
+                                                <div className="font-bold text-ink">{campaign.name}</div>
                                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
                                                     campaign.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-gray-100 text-gray-700'
+                                                        'bg-surface-hover text-ink-secondary'
                                                     }`}>
                                                     {campaign.status}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-gray-500 mt-1">
-                                                <span className="font-medium text-gray-700">
+                                            <div className="text-sm text-ink-tertiary mt-1">
+                                                <span className="font-medium text-ink-secondary">
                                                     {(campaign.dailyBudget || campaign.lifetimeBudget) ? 'CBO' : 'ABO'}
                                                 </span>
                                                 {' • '}{campaign.objective}
@@ -197,7 +197,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                                             </div>
                                         </div>
                                         {selectedCampaign?.id === campaign.id && (
-                                            <Check className="text-amber-600" size={20} />
+                                            <Check className="text-brand-600" size={20} />
                                         )}
                                     </div>
                                 </div>
@@ -211,7 +211,7 @@ const CampaignStep = ({ onNext, onBack }) => {
             {mode === 'new' && (
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-ink-secondary mb-2">
                             Campaign Name *
                         </label>
                         <input
@@ -219,18 +219,18 @@ const CampaignStep = ({ onNext, onBack }) => {
                             value={campaignData.name}
                             onChange={(e) => handleInputChange('name', e.target.value)}
                             placeholder="Summer Sale Campaign"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-ink-secondary mb-2">
                             Campaign Objective *
                         </label>
                         <select
                             value={campaignData.objective}
                             onChange={(e) => handleInputChange('objective', e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                         >
                             <option value="">Select objective...</option>
                             {CAMPAIGN_OBJECTIVES.map(obj => (
@@ -240,7 +240,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-ink-secondary mb-2">
                             Budget Type *
                         </label>
                         <div className="grid grid-cols-2 gap-4">
@@ -248,23 +248,23 @@ const CampaignStep = ({ onNext, onBack }) => {
                                 type="button"
                                 onClick={() => handleInputChange('budgetType', 'ABO')}
                                 className={`p-3 rounded-lg border-2 transition-all ${campaignData.budgetType === 'ABO'
-                                    ? 'border-amber-600 bg-amber-50'
-                                    : 'border-gray-200 hover:border-amber-300'
+                                    ? 'border-brand-600 bg-brand-50'
+                                    : 'border-border hover:border-brand-300'
                                     }`}
                             >
                                 <div className="font-semibold">ABO</div>
-                                <div className="text-xs text-gray-500">Ad Set Budget</div>
+                                <div className="text-xs text-ink-tertiary">Ad Set Budget</div>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleInputChange('budgetType', 'CBO')}
                                 className={`p-3 rounded-lg border-2 transition-all ${campaignData.budgetType === 'CBO'
-                                    ? 'border-amber-600 bg-amber-50'
-                                    : 'border-gray-200 hover:border-amber-300'
+                                    ? 'border-brand-600 bg-brand-50'
+                                    : 'border-border hover:border-brand-300'
                                     }`}
                             >
                                 <div className="font-semibold">CBO</div>
-                                <div className="text-xs text-gray-500">Campaign Budget</div>
+                                <div className="text-xs text-ink-tertiary">Campaign Budget</div>
                             </button>
                         </div>
                     </div>
@@ -272,12 +272,12 @@ const CampaignStep = ({ onNext, onBack }) => {
                     {campaignData.budgetType === 'CBO' && (
                         <>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-ink-secondary mb-2">
                                     Daily Budget (USD)
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-gray-500">$</span>
+                                        <span className="text-ink-tertiary">$</span>
                                     </div>
                                     <input
                                         type="number"
@@ -286,19 +286,19 @@ const CampaignStep = ({ onNext, onBack }) => {
                                         placeholder="100"
                                         min="1"
                                         step="1"
-                                        className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        className="w-full pl-7 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-ink-secondary mb-2">
                                     Bid Strategy
                                 </label>
                                 <select
                                     value={campaignData.bidStrategy}
                                     onChange={(e) => handleInputChange('bidStrategy', e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                                 >
                                     <option value="">Select bid strategy...</option>
                                     {BID_STRATEGIES.map(strategy => (
@@ -310,12 +310,12 @@ const CampaignStep = ({ onNext, onBack }) => {
                             {/* Bid Amount - Required for Cost Cap and Bid Cap strategies */}
                             {(campaignData.bidStrategy === 'COST_CAP' || campaignData.bidStrategy === 'LOWEST_COST_WITH_BID_CAP') && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-ink-secondary mb-2">
                                         {campaignData.bidStrategy === 'COST_CAP' ? 'Cost Cap Amount (USD)' : 'Bid Cap Amount (USD)'} *
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-gray-500">$</span>
+                                            <span className="text-ink-tertiary">$</span>
                                         </div>
                                         <input
                                             type="number"
@@ -324,10 +324,10 @@ const CampaignStep = ({ onNext, onBack }) => {
                                             placeholder="10.00"
                                             min="0.01"
                                             step="0.01"
-                                            className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                            className="w-full pl-7 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-ink-tertiary mt-1">
                                         {campaignData.bidStrategy === 'COST_CAP'
                                             ? 'Maximum average cost per result you want to maintain'
                                             : 'Maximum bid amount for each auction'}
@@ -344,7 +344,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                 {onBack && (
                     <button
                         onClick={onBack}
-                        className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
+                        className="px-6 py-3 text-ink-secondary hover:text-ink font-medium"
                     >
                         Back
                     </button>
@@ -352,7 +352,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                 <button
                     onClick={handleNext}
                     disabled={loading}
-                    className="ml-auto flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="ml-auto flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 disabled:bg-border disabled:cursor-not-allowed"
                 >
                     {loading ? 'Saving...' : 'Next Step'} <ChevronRight size={20} />
                 </button>

@@ -26,22 +26,22 @@ const AnalyzeTemplatesStep = ({ selectedTemplate, onNext, onBack }) => {
     return (
         <div>
             <h2 className="text-2xl font-bold mb-2">Analyze Template</h2>
-            <p className="text-gray-600 mb-8">Analyzing the selected template to optimize your content.</p>
+            <p className="text-ink-secondary mb-8">Analyzing the selected template to optimize your content.</p>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-8 mb-8">
+            <div className="bg-surface border border-border rounded-xl p-8 mb-8">
                 <div className="flex items-center gap-6 mb-8">
                     {/* Template Preview */}
-                    <div className="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 border border-gray-200">
+                    <div className="w-32 h-32 bg-surface-hover rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
                         {selectedTemplate?.thumbnail ? (
                             <img src={selectedTemplate.thumbnail} alt={selectedTemplate.name} className="w-full h-full object-cover rounded-lg" />
                         ) : (
-                            <span className="text-gray-400 text-xs text-center px-2">{selectedTemplate?.name || 'Template'}</span>
+                            <span className="text-ink-tertiary text-xs text-center px-2">{selectedTemplate?.name || 'Template'}</span>
                         )}
                     </div>
 
                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedTemplate?.name}</h3>
-                        <p className="text-gray-500 text-sm">{selectedTemplate?.description || 'No description available.'}</p>
+                        <h3 className="text-xl font-bold text-ink mb-2">{selectedTemplate?.name}</h3>
+                        <p className="text-ink-tertiary text-sm">{selectedTemplate?.description || 'No description available.'}</p>
                     </div>
                 </div>
 
@@ -92,14 +92,14 @@ const AnalyzeTemplatesStep = ({ selectedTemplate, onNext, onBack }) => {
             <div className="flex justify-between">
                 <button
                     onClick={onBack}
-                    className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
+                    className="px-6 py-3 text-ink-secondary hover:text-ink font-medium"
                 >
                     Back
                 </button>
                 <button
                     onClick={onNext}
                     disabled={analyzing}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-border disabled:cursor-not-allowed"
                 >
                     Next Step <ChevronRight size={20} />
                 </button>

@@ -145,24 +145,24 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-900">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border">
+                    <h2 className="text-xl font-bold text-ink">
                         {initialData ? 'Edit Product' : 'Add New Product'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                    <button onClick={onClose} className="text-ink-tertiary hover:bg-surface-hover p-2 rounded-full">
                         <X size={20} />
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-1">Brand</label>
                         <select
                             required
                             value={formData.brandId}
                             onChange={e => setFormData({ ...formData, brandId: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             disabled={!!initialData}
                         >
                             <option value="">Select a Brand...</option>
@@ -176,70 +176,70 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-1">Product Name</label>
                         <input
                             required
                             type="text"
                             maxLength={100}
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             placeholder="e.g. Glow Serum"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-1">Description</label>
                         <textarea
                             value={formData.description}
                             maxLength={500}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             rows="3"
                             placeholder="Short description of the product..."
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Landing Page URL</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-1">Landing Page URL</label>
                         <input
                             type="url"
                             value={formData.default_url || ''}
                             onChange={e => setFormData({ ...formData, default_url: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             placeholder="https://example.com/signup"
                         />
-                        <p className="text-xs text-gray-500 mt-1">The product's main link.</p>
+                        <p className="text-xs text-ink-tertiary mt-1">The product's main link.</p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Capture a Screenshot</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-1">Capture a Screenshot</label>
                         <div className="flex gap-2">
                             <input
                                 type="url"
                                 value={captureUrl}
                                 onChange={e => setCaptureUrl(e.target.value)}
-                                className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                                 placeholder="https://example.com/signup"
                             />
                             <button
                                 type="button"
                                 onClick={handleCaptureScreenshot}
                                 disabled={!captureUrl || capturingScreenshot}
-                                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                                className="px-3 py-1.5 text-sm border border-border rounded-lg text-ink-secondary hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
                             >
                                 {capturingScreenshot ? <Loader size={14} className="animate-spin" /> : <Camera size={14} />}
                                 {capturingScreenshot ? 'Capturing...' : 'Capture'}
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Enter any URL from the funnel (landing page, form, thank-you page) and capture — repeat for as many steps as you need. Each capture adds a real screenshot to the Product Shots below, independent of the Landing Page URL above.</p>
+                        <p className="text-xs text-ink-tertiary mt-1">Enter any URL from the funnel (landing page, form, thank-you page) and capture — repeat for as many steps as you need. Each capture adds a real screenshot to the Product Shots below, independent of the Landing Page URL above.</p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Product Shots</label>
+                        <label className="block text-sm font-medium text-ink-secondary mb-2">Product Shots</label>
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             {(formData.product_shots || []).map((shot, index) => (
-                                <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+                                <div key={index} className="relative aspect-square bg-surface-hover rounded-lg overflow-hidden group">
                                     <img src={shot} alt={`Product shot ${index + 1}`} className="w-full h-full object-cover" />
                                     <button
                                         type="button"
@@ -254,7 +254,7 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploading}
-                                className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                className="aspect-square border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-ink-tertiary hover:border-blue-500 hover:text-blue-500 transition-colors"
                             >
                                 {uploading ? <Loader size={20} className="animate-spin" /> : <Upload size={20} />}
                                 <span className="text-xs mt-1">{uploading ? 'Uploading...' : 'Upload'}</span>
@@ -268,14 +268,14 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
-                        <p className="text-xs text-gray-500">Upload product images to use in ad generation.</p>
+                        <p className="text-xs text-ink-tertiary">Upload product images to use in ad generation.</p>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                            className="px-4 py-2 text-ink-secondary hover:bg-surface-hover rounded-lg"
                         >
                             Cancel
                         </button>

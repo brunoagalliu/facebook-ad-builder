@@ -346,11 +346,11 @@ export default function VideoAds() {
         <div className="max-w-5xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                    <Video size={32} className="text-amber-600" />
+                <h1 className="text-3xl font-bold text-ink flex items-center gap-3">
+                    <Video size={32} className="text-brand-600" />
                     Create Video Ads
                 </h1>
-                <p className="text-gray-600 mt-1">Generate AI UGC-style video ads from your product assets</p>
+                <p className="text-ink-secondary mt-1">Generate AI UGC-style video ads from your product assets</p>
             </div>
 
             {/* Skip straight to Generate once there's a real winning ad's hook line to
@@ -358,20 +358,20 @@ export default function VideoAds() {
                 Character/Setting/Script when nothing in them needs customizing. */}
             {wizardData.brand && wizardData.product && wizardData.profile
                 && selectedVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 5 && (
-                <div className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="mb-6 flex items-center justify-between gap-4 bg-brand-50 border border-brand-200 rounded-xl p-4">
                     <div className="flex items-center gap-3">
                         {selectedVideoTemplate.image_url && (
                             <img src={selectedVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                         )}
                         <div>
-                            <p className="font-medium text-gray-900">Ready to generate from {selectedVideoTemplate.name}</p>
-                            <p className="text-sm text-gray-600">Skip Video Style — hook line and pacing pulled from this winning ad.</p>
+                            <p className="font-medium text-ink">Ready to generate from {selectedVideoTemplate.name}</p>
+                            <p className="text-sm text-ink-secondary">Skip Video Style — hook line and pacing pulled from this winning ad.</p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={() => { fillFromWinningAd(); setCurrentStep(5); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium whitespace-nowrap"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium whitespace-nowrap"
                     >
                         ⚡ Skip to Generate
                     </button>
@@ -379,9 +379,9 @@ export default function VideoAds() {
             )}
 
             {/* Progress Steps */}
-            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="mb-8 bg-surface rounded-xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between relative">
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
+                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-border -z-10"></div>
                     {steps.map((step) => {
                         const Icon = step.icon;
                         const isActive = step.id === currentStep;
@@ -398,19 +398,19 @@ export default function VideoAds() {
                         return (
                             <div
                                 key={step.id}
-                                className={`flex flex-col items-center bg-white px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
+                                className={`flex flex-col items-center bg-surface px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
                                 onClick={() => isClickable && handleStepClick(step.id)}
                             >
                                 <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-amber-600 text-white scale-110 shadow-md' :
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-brand-600 text-white scale-110 shadow-md' :
                                         isCompleted ? 'bg-green-500 text-white group-hover:bg-green-600' :
-                                            'bg-gray-200 text-gray-500 group-hover:bg-gray-300'
+                                            'bg-border text-ink-tertiary group-hover:bg-border'
                                         }`}
                                 >
                                     {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                 </div>
-                                <span className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-600' :
-                                    isClickable ? 'text-gray-500 group-hover:text-gray-700' : 'text-gray-400'
+                                <span className={`text-xs font-medium transition-colors ${isActive ? 'text-brand-600' :
+                                    isClickable ? 'text-ink-tertiary group-hover:text-ink-secondary' : 'text-ink-tertiary'
                                     }`}>
                                     {step.name}
                                 </span>
@@ -421,7 +421,7 @@ export default function VideoAds() {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px] relative">
+            <div className="bg-surface rounded-xl shadow-sm border border-border p-8 min-h-[500px] relative">
                 {/* Step 1: Brand Selection */}
                 {currentStep === 1 && (
                     <BrandSelectionStep
@@ -465,22 +465,22 @@ export default function VideoAds() {
                 {currentStep === 4 && (
                     <div className="space-y-6">
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-1">Creative Reference</h3>
-                            <p className="text-sm text-gray-500 mb-3">
+                            <h3 className="text-lg font-bold text-ink mb-1">Creative Reference</h3>
+                            <p className="text-sm text-ink-tertiary mb-3">
                                 Base this video on one specific winning ad, a synthesis of the whole vertical's proven patterns, or let it auto-pick.
                             </p>
-                            <div className="flex gap-2 mb-3 bg-gray-100 p-1 rounded-lg w-fit">
+                            <div className="flex gap-2 mb-3 bg-surface-hover p-1 rounded-lg w-fit">
                                 <button
                                     type="button"
                                     onClick={() => handleTemplateModeChange('auto')}
-                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'auto' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'auto' ? 'bg-surface text-brand-600 shadow-sm' : 'text-ink-secondary hover:text-ink'}`}
                                 >
                                     <div className="flex items-center gap-2"><Sparkles size={16} /> Auto</div>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleTemplateModeChange('single')}
-                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'single' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                    className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'single' ? 'bg-surface text-brand-600 shadow-sm' : 'text-ink-secondary hover:text-ink'}`}
                                 >
                                     <div className="flex items-center gap-2"><Film size={16} /> Specific Ad</div>
                                 </button>
@@ -488,7 +488,7 @@ export default function VideoAds() {
                                     <button
                                         type="button"
                                         onClick={() => handleTemplateModeChange('vertical')}
-                                        className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'vertical' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                        className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${templateMode === 'vertical' ? 'bg-surface text-brand-600 shadow-sm' : 'text-ink-secondary hover:text-ink'}`}
                                     >
                                         <div className="flex items-center gap-2"><Wand2 size={16} /> Whole Vertical</div>
                                     </button>
@@ -497,14 +497,14 @@ export default function VideoAds() {
 
                             {templateMode === 'single' && (
                                 selectedVideoTemplate ? (
-                                    <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between gap-3 bg-brand-50 border border-brand-200 rounded-lg p-3">
                                         <div className="flex items-center gap-3 min-w-0">
                                             {selectedVideoTemplate.image_url && (
                                                 <img src={selectedVideoTemplate.image_url} alt="" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                                             )}
-                                            <span className="text-sm font-medium text-gray-900 truncate">{selectedVideoTemplate.name}</span>
+                                            <span className="text-sm font-medium text-ink truncate">{selectedVideoTemplate.name}</span>
                                         </div>
-                                        <button type="button" onClick={() => setShowTemplatePicker(true)} className="text-sm text-amber-700 hover:text-amber-800 font-medium whitespace-nowrap">
+                                        <button type="button" onClick={() => setShowTemplatePicker(true)} className="text-sm text-brand-700 hover:text-brand-800 font-medium whitespace-nowrap">
                                             Change
                                         </button>
                                     </div>
@@ -512,7 +512,7 @@ export default function VideoAds() {
                                     <button
                                         type="button"
                                         onClick={() => setShowTemplatePicker(true)}
-                                        className="text-sm px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+                                        className="text-sm px-4 py-2 bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 font-medium"
                                     >
                                         Browse winning ads…
                                     </button>
@@ -521,50 +521,50 @@ export default function VideoAds() {
 
                             {templateMode === 'vertical' && (
                                 loadingVerticalTemplate ? (
-                                    <div className="text-sm text-gray-500">Synthesizing patterns across this vertical's winning ads…</div>
+                                    <div className="text-sm text-ink-tertiary">Synthesizing patterns across this vertical's winning ads…</div>
                                 ) : selectedVideoTemplate ? (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                        <p className="text-sm font-medium text-gray-900">{selectedVideoTemplate.name}</p>
-                                        <p className="text-sm text-gray-600">Synthesized from {selectedVideoTemplate.source_count} winning ad{selectedVideoTemplate.source_count === 1 ? '' : 's'} in this vertical.</p>
+                                    <div className="bg-brand-50 border border-brand-200 rounded-lg p-3">
+                                        <p className="text-sm font-medium text-ink">{selectedVideoTemplate.name}</p>
+                                        <p className="text-sm text-ink-secondary">Synthesized from {selectedVideoTemplate.source_count} winning ad{selectedVideoTemplate.source_count === 1 ? '' : 's'} in this vertical.</p>
                                     </div>
                                 ) : (
-                                    <div className="text-sm text-gray-500">No analyzed winning ads found in this brand's vertical yet.</div>
+                                    <div className="text-sm text-ink-tertiary">No analyzed winning ads found in this brand's vertical yet.</div>
                                 )
                             )}
                         </div>
 
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-1">Character</h3>
-                            <p className="text-sm text-gray-500 mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
+                            <h3 className="text-lg font-bold text-ink mb-1">Character</h3>
+                            <p className="text-sm text-ink-tertiary mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
                             <div className="grid grid-cols-2 gap-3">
-                                <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
-                                <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
+                                <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                                 <textarea
                                     value={character.description}
                                     onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
                                     placeholder="Additional detail: hair, features, clothing, voice, mannerisms…"
                                     rows={2}
-                                    className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="col-span-2 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-1">Setting</h3>
+                            <h3 className="text-lg font-bold text-ink mb-1">Setting</h3>
                             <input
                                 type="text"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
                                 placeholder="e.g. a cozy, well-lit home kitchen"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             />
                         </div>
 
                         <div>
                             <div className="flex items-center justify-between mb-1">
-                                <h3 className="text-lg font-bold text-gray-900">Aspect Ratio</h3>
+                                <h3 className="text-lg font-bold text-ink">Aspect Ratio</h3>
                             </div>
                             <div className="flex gap-2">
                                 {['portrait', 'landscape'].map((ratio) => (
@@ -572,7 +572,7 @@ export default function VideoAds() {
                                         key={ratio}
                                         type="button"
                                         onClick={() => setAspectRatio(ratio)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${aspectRatio === ratio ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${aspectRatio === ratio ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
                                     >
                                         {ratio}
                                     </button>
@@ -581,40 +581,40 @@ export default function VideoAds() {
                         </div>
 
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-1">Video Model</h3>
+                            <h3 className="text-lg font-bold text-ink mb-1">Video Model</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div
                                     onClick={() => selectModel('seedance')}
-                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-amber-600 bg-amber-50' : 'border-gray-200 hover:border-amber-300'}`}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-gray-900">Seedance 2.0 — Continuous Take</span>
-                                        {model === 'seedance' && <Check className="text-amber-600" size={18} />}
+                                        <span className="font-bold text-ink">Seedance 2.0 — Continuous Take</span>
+                                        {model === 'seedance' && <Check className="text-brand-600" size={18} />}
                                     </div>
-                                    <p className="text-sm text-gray-600">One fluid handheld shot, no cuts. (Default)</p>
+                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts. (Default)</p>
                                 </div>
                                 <div
                                     onClick={() => selectModel('kling-o3')}
-                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'kling-o3' ? 'border-amber-600 bg-amber-50' : 'border-gray-200 hover:border-amber-300'}`}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'kling-o3' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-gray-900">Kling O3 — Multi-Shot</span>
-                                        {model === 'kling-o3' && <Check className="text-amber-600" size={18} />}
+                                        <span className="font-bold text-ink">Kling O3 — Multi-Shot</span>
+                                        {model === 'kling-o3' && <Check className="text-brand-600" size={18} />}
                                     </div>
-                                    <p className="text-sm text-gray-600">Up to 6 distinct shots/cuts. Higher cost per generation. Reference photos aren't used yet for this model.</p>
+                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts. Higher cost per generation. Reference photos aren't used yet for this model.</p>
                                 </div>
                             </div>
                         </div>
 
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-bold text-gray-900">Script</h3>
+                                <h3 className="text-lg font-bold text-ink">Script</h3>
                                 <div className="flex items-center gap-3">
                                     {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && (
                                         <button
                                             type="button"
                                             onClick={fillFromWinningAd}
-                                            className="flex items-center gap-1 text-sm px-3 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+                                            className="flex items-center gap-1 text-sm px-3 py-1 bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 font-medium"
                                             title="Fills Scene 1's action/dialogue with this vertical's winning ad's actual hook line"
                                         >
                                             ✨ Fill from Winning Ad
@@ -624,40 +624,40 @@ export default function VideoAds() {
                                         type="button"
                                         onClick={addScene}
                                         disabled={scenes.length >= maxScenes}
-                                        className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         <Plus size={16} /> Add scene
                                     </button>
                                 </div>
                             </div>
-                            <p className="text-sm text-gray-500 mb-1">
+                            <p className="text-sm text-ink-tertiary mb-1">
                                 {model === 'kling-o3'
                                     ? `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total — each scene renders as its own distinct shot/cut.`
                                     : `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.`}
                                 {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && ' Scene 1 can stay blank to use the winning ad\'s own hook line directly.'}
                             </p>
-                            <p className="text-sm text-gray-500 mb-1">
+                            <p className="text-sm text-ink-tertiary mb-1">
                                 Tip: for lead-gen offers, a scene like <span className="italic">"She holds her phone up, scrolling through the signup form — name, email, phone — and taps the button to submit"</span> renders as a natural phone reveal, not just narration.
                             </p>
-                            <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-gray-400'}`}>
+                            <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-ink-tertiary'}`}>
                                 {totalDuration}s / {MAX_TOTAL_DURATION}s{totalDuration > MAX_TOTAL_DURATION ? ' — will be trimmed to fit' : ''}
                             </p>
                             <div className="space-y-3">
                                 {scenes.map((scene, i) => (
-                                    <div key={i} className="border border-gray-200 rounded-lg p-3">
+                                    <div key={i} className="border border-border rounded-lg p-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium text-gray-700">Scene {i + 1}</span>
+                                                <span className="text-sm font-medium text-ink-secondary">Scene {i + 1}</span>
                                                 <select
                                                     value={scene.durationSeconds}
                                                     onChange={(e) => updateScene(i, 'durationSeconds', Number(e.target.value))}
-                                                    className="text-sm border border-gray-300 rounded px-2 py-1"
+                                                    className="text-sm border border-border rounded px-2 py-1"
                                                 >
                                                     {sceneDurationOptions.map((d) => <option key={d} value={d}>{d}s</option>)}
                                                 </select>
                                             </div>
                                             {scenes.length > 1 && (
-                                                <button type="button" onClick={() => removeScene(i)} className="text-gray-400 hover:text-red-600">
+                                                <button type="button" onClick={() => removeScene(i)} className="text-ink-tertiary hover:text-red-600">
                                                     <Trash2 size={16} />
                                                 </button>
                                             )}
@@ -671,7 +671,7 @@ export default function VideoAds() {
                                                     : 'e.g. She holds up the product, smiling: "Okay, so this might sound crazy, but I swear this actually worked."'
                                             }
                                             rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                                            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
                                         />
                                     </div>
                                 ))}
@@ -685,14 +685,14 @@ export default function VideoAds() {
                     <div className="text-center py-12">
                         {!generatedVideoUrl && !generating && (
                             <>
-                                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Sparkles className="text-amber-600" size={32} />
+                                <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Sparkles className="text-brand-600" size={32} />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Generate Video</h3>
-                                <p className="text-gray-600 mb-6">Ready to generate your AI UGC video ad.</p>
+                                <h3 className="text-xl font-bold text-ink mb-2">Generate Video</h3>
+                                <p className="text-ink-secondary mb-6">Ready to generate your AI UGC video ad.</p>
                                 <button
                                     onClick={handleGenerate}
-                                    className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition-colors mx-auto"
+                                    className="flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium transition-colors mx-auto"
                                 >
                                     <Sparkles size={20} />
                                     Generate Video
@@ -702,11 +702,11 @@ export default function VideoAds() {
 
                         {generating && (
                             <>
-                                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                                    <Sparkles className="text-amber-600" size={32} />
+                                <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                                    <Sparkles className="text-brand-600" size={32} />
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">{stateLabel[generationState] || 'Working…'}</h3>
-                                <p className="text-gray-600">This can take a few minutes. Feel free to wait — don't navigate away.</p>
+                                <h3 className="text-xl font-bold text-ink mb-2">{stateLabel[generationState] || 'Working…'}</h3>
+                                <p className="text-ink-secondary">This can take a few minutes. Feel free to wait — don't navigate away.</p>
                             </>
                         )}
 
@@ -721,7 +721,7 @@ export default function VideoAds() {
                                     <a
                                         href={generatedVideoUrl}
                                         download
-                                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                                        className="flex items-center gap-2 px-4 py-2 bg-surface-hover text-ink-secondary rounded-lg hover:bg-border font-medium"
                                     >
                                         <Download size={18} /> Download
                                     </a>
@@ -730,7 +730,7 @@ export default function VideoAds() {
                                             setGeneratedVideoUrl(null);
                                             setGenerationState(null);
                                         }}
-                                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium"
+                                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium"
                                     >
                                         <Sparkles size={18} /> Generate Another
                                     </button>
@@ -747,8 +747,8 @@ export default function VideoAds() {
                     onClick={prevStep}
                     disabled={currentStep === 1 || generating}
                     className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${currentStep === 1 || generating
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-surface-hover text-ink-tertiary cursor-not-allowed'
+                        : 'bg-surface-hover text-ink-secondary hover:bg-border'
                         }`}
                 >
                     <ChevronLeft size={20} />
@@ -759,7 +759,7 @@ export default function VideoAds() {
                     <button
                         onClick={nextStep}
                         disabled={!canProceed()}
-                        className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         Continue
                         <ChevronRight size={20} />

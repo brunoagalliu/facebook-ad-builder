@@ -13,6 +13,7 @@ import { AuthProvider } from './context/AuthContext';
 import { BrandProvider } from './context/BrandContext';
 import { CampaignProvider } from './context/CampaignContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -37,6 +38,7 @@ import UserManagement from './pages/UserManagement';
 
 function App() {
   return (
+    <ThemeProvider>
     <ToastProvider>
       <AuthProvider>
         <BrandProvider>
@@ -86,6 +88,7 @@ function App() {
         </BrandProvider>
       </AuthProvider>
     </ToastProvider>
+    </ThemeProvider>
   );
 }
 

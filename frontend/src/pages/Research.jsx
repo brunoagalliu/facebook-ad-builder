@@ -550,8 +550,8 @@ const Research = () => {
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800">Ad Research</h1>
-                <p className="text-gray-600 mt-2">
+                <h1 className="text-3xl font-bold text-ink">Ad Research</h1>
+                <p className="text-ink-secondary mt-2">
                     Scrape Facebook Ads Library and save searches with ads
                 </p>
             </div>
@@ -563,7 +563,7 @@ const Research = () => {
                     <div className="flex justify-between items-center">
                         <div>
                             <h2 className="text-2xl font-bold">Research Verticals</h2>
-                            <p className="text-gray-600 mt-1">Select a vertical to view and manage searches</p>
+                            <p className="text-ink-secondary mt-1">Select a vertical to view and manage searches</p>
                         </div>
                         <button
                             onClick={() => setShowVerticalModal(true)}
@@ -576,8 +576,8 @@ const Research = () => {
                     {verticals.length === 0 ? (
                         <div className="text-center py-16">
                             <div className="max-w-md mx-auto">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Verticals Yet</h3>
-                                <p className="text-gray-600 mb-4">
+                                <h3 className="text-lg font-semibold text-ink mb-2">No Verticals Yet</h3>
+                                <p className="text-ink-secondary mb-4">
                                     Create verticals to organize your research by category (Legal, Fitness, E-commerce, etc.)
                                 </p>
                                 <button
@@ -597,14 +597,14 @@ const Research = () => {
                                         setSelectedVertical(vertical);
                                         setActiveTab('vertical-detail');
                                     }}
-                                    className="bg-white p-6 rounded-lg border-2 border-gray-200 shadow-sm hover:border-indigo-500 hover:shadow-md transition-all text-left"
+                                    className="bg-surface p-6 rounded-lg border-2 border-border shadow-sm hover:border-indigo-500 hover:shadow-md transition-all text-left"
                                 >
-                                    <h3 className="font-semibold text-xl text-gray-900 mb-2">{vertical.name}</h3>
+                                    <h3 className="font-semibold text-xl text-ink mb-2">{vertical.name}</h3>
                                     {vertical.description && (
-                                        <p className="text-gray-600 text-sm mb-4">{vertical.description}</p>
+                                        <p className="text-ink-secondary text-sm mb-4">{vertical.description}</p>
                                     )}
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-500">
+                                        <span className="text-ink-tertiary">
                                             Created {new Date(vertical.created_at).toLocaleDateString()}
                                         </span>
                                         <span className="text-indigo-600 font-medium">View →</span>
@@ -625,27 +625,27 @@ const Research = () => {
                                 setSelectedVertical(null);
                                 setActiveTab('verticals');
                             }}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="text-ink-secondary hover:text-ink"
                         >
                             ← Back to Verticals
                         </button>
                         <div>
                             <h2 className="text-2xl font-bold">{selectedVertical.name}</h2>
                             {selectedVertical.description && (
-                                <p className="text-gray-600">{selectedVertical.description}</p>
+                                <p className="text-ink-secondary">{selectedVertical.description}</p>
                             )}
                         </div>
                     </div>
 
                     {/* Vertical Detail Tabs */}
-                    <div className="border-b border-gray-200">
+                    <div className="border-b border-border">
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setVerticalTab('aggregated')}
                                 className={`px-4 py-2 font-medium border-b-2 transition-colors ${
                                     verticalTab === 'aggregated'
                                         ? 'border-indigo-600 text-indigo-600'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        : 'border-transparent text-ink-secondary hover:text-ink'
                                 }`}
                             >
                                 Aggregated Ads
@@ -655,7 +655,7 @@ const Research = () => {
                                 className={`px-4 py-2 font-medium border-b-2 transition-colors ${
                                     verticalTab === 'search'
                                         ? 'border-indigo-600 text-indigo-600'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        : 'border-transparent text-ink-secondary hover:text-ink'
                                 }`}
                             >
                                 Search & History
@@ -665,12 +665,12 @@ const Research = () => {
 
                     {/* Aggregated Ads Tab */}
                     {verticalTab === 'aggregated' && (
-                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <div className="bg-surface rounded-lg border border-border p-6">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
                                     <h3 className="text-lg font-semibold">Unique Ads by Page</h3>
                                     {aggregatedAds.length > 0 && (
-                                        <p className="text-sm text-gray-600 mt-1">
+                                        <p className="text-sm text-ink-secondary mt-1">
                                             Total: {aggregatedAds.reduce((sum, page) => sum + page.total_ads, 0)} unique ads across {aggregatedAds.length} pages
                                         </p>
                                     )}
@@ -681,12 +681,12 @@ const Research = () => {
                                         value={aggregatedFilter}
                                         onChange={(e) => setAggregatedFilter(e.target.value)}
                                         placeholder="Filter by keyword..."
-                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none w-64"
+                                        className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none w-64"
                                     />
                                 )}
                             </div>
                             {aggregatedAds.length === 0 ? (
-                                <p className="text-gray-500 text-center py-8">No ads yet. Run a search to see aggregated results.</p>
+                                <p className="text-ink-tertiary text-center py-8">No ads yet. Run a search to see aggregated results.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {(() => {
@@ -698,21 +698,21 @@ const Research = () => {
                                             : aggregatedAds;
 
                                         return filteredPages.length === 0 ? (
-                                            <p className="text-gray-500 text-center py-8">No pages match your filter.</p>
+                                            <p className="text-ink-tertiary text-center py-8">No pages match your filter.</p>
                                         ) : (<>
                                         <div className="flex items-center gap-3 px-1 pb-1">
-                                            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                                            <label className="flex items-center gap-2 text-sm text-ink-secondary cursor-pointer select-none">
                                                 <input
                                                     type="checkbox"
                                                     checked={filteredPages.length > 0 && filteredPages.every(p => selectedPageIds.has(p.page_id))}
                                                     onChange={() => toggleSelectAllPages(filteredPages.map(p => p.page_id))}
-                                                    className="rounded border-gray-300"
+                                                    className="rounded border-border"
                                                 />
                                                 Select all
                                             </label>
                                             {selectedPageIds.size > 0 && (
                                                 <div className="flex items-center gap-2 ml-auto">
-                                                    <span className="text-sm text-gray-600">{selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'} selected</span>
+                                                    <span className="text-sm text-ink-secondary">{selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'} selected</span>
                                                     <button
                                                         onClick={() => setBatchDeletePending(true)}
                                                         className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
@@ -723,26 +723,26 @@ const Research = () => {
                                             )}
                                         </div>
                                         {filteredPages.map((page) => (
-                                        <div key={page.page_id} className="border border-gray-200 rounded-lg overflow-hidden">
-                                            <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                                        <div key={page.page_id} className="border border-border rounded-lg overflow-hidden">
+                                            <div className="px-4 py-3 bg-surface-hover flex items-center justify-between">
                                                 <div className="flex-1 flex items-center gap-3">
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedPageIds.has(page.page_id)}
                                                         onChange={() => togglePageSelection(page.page_id)}
-                                                        className="rounded border-gray-300"
+                                                        className="rounded border-border"
                                                     />
                                                     <span
                                                         onClick={() => togglePageExpansion(page.page_id)}
-                                                        className="text-gray-600 hover:text-gray-900 transition-transform cursor-pointer select-none"
+                                                        className="text-ink-secondary hover:text-ink transition-transform cursor-pointer select-none"
                                                         style={{ transform: expandedPages.has(page.page_id) ? 'rotate(90deg)' : 'rotate(0deg)' }}
                                                     >
                                                         ▶
                                                     </span>
                                                     <div>
-                                                        <h4 className="font-semibold text-gray-900">{page.page_name}</h4>
+                                                        <h4 className="font-semibold text-ink">{page.page_name}</h4>
                                                         <div className="flex items-center gap-4 mt-1 text-sm">
-                                                            <span className="text-gray-700 font-medium">
+                                                            <span className="text-ink-secondary font-medium">
                                                                 {page.total_ads} unique ads
                                                             </span>
                                                             <div className="flex items-center gap-3 text-xs">
@@ -786,11 +786,11 @@ const Research = () => {
 
                                             {/* Expanded ads */}
                                             {expandedPages.has(page.page_id) && (
-                                                <div className="px-4 py-3 bg-white border-t border-gray-200">
+                                                <div className="px-4 py-3 bg-surface border-t border-border">
                                                     {!pageAds[page.page_id] ? (
-                                                        <div className="text-center py-4 text-gray-500">Loading ads...</div>
+                                                        <div className="text-center py-4 text-ink-tertiary">Loading ads...</div>
                                                     ) : pageAds[page.page_id].length === 0 ? (
-                                                        <div className="text-center py-4 text-gray-500">No ads found</div>
+                                                        <div className="text-center py-4 text-ink-tertiary">No ads found</div>
                                                     ) : (
                                                         <div className="space-y-3">
                                                             {(() => {
@@ -808,25 +808,25 @@ const Research = () => {
                                                                     : pageAds[page.page_id];
 
                                                                 return filteredAds.length === 0 ? (
-                                                                    <div className="text-center py-4 text-gray-500">No ads match your filter.</div>
+                                                                    <div className="text-center py-4 text-ink-tertiary">No ads match your filter.</div>
                                                                 ) : filteredAds.map((ad) => (
-                                                                <div key={ad.id} className="border border-gray-200 rounded p-3 hover:shadow-sm">
+                                                                <div key={ad.id} className="border border-border rounded p-3 hover:shadow-sm">
                                                                     <div className="flex justify-between items-start mb-2">
                                                                         <div className="flex-1">
                                                                             {ad.headline && (
-                                                                                <h5 className="font-semibold text-gray-900">{ad.headline}</h5>
+                                                                                <h5 className="font-semibold text-ink">{ad.headline}</h5>
                                                                             )}
                                                                             {ad.ad_copy && (
-                                                                                <p className="text-sm text-gray-700 mt-1">{ad.ad_copy}</p>
+                                                                                <p className="text-sm text-ink-secondary mt-1">{ad.ad_copy}</p>
                                                                             )}
                                                                         </div>
                                                                         {ad.media_type && (
-                                                                            <span className="ml-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                                                                            <span className="ml-2 px-2 py-1 text-xs bg-surface-hover text-ink-secondary rounded">
                                                                                 {ad.media_type}
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                                                                    <div className="flex items-center justify-between text-xs text-ink-tertiary mt-2">
                                                                         <div className="flex items-center gap-3">
                                                                             {ad.cta_text && (
                                                                                 <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded">
@@ -836,12 +836,12 @@ const Research = () => {
                                                                             <span className={`px-2 py-1 rounded font-medium ${
                                                                                 (ad.seen_count || 1) > 1
                                                                                     ? 'bg-green-100 text-green-700'
-                                                                                    : 'bg-gray-100 text-gray-600'
+                                                                                    : 'bg-surface-hover text-ink-secondary'
                                                                             }`}>
                                                                                 Seen {ad.seen_count || 1}x
                                                                             </span>
                                                                             {ad.run_duration_days != null && (
-                                                                                <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded font-medium" title="Days this ad has been running — the strongest signal available that it's still working">
+                                                                                <span className="px-2 py-1 bg-brand-50 text-brand-700 rounded font-medium" title="Days this ad has been running — the strongest signal available that it's still working">
                                                                                     Running {ad.run_duration_days}d
                                                                                 </span>
                                                                             )}
@@ -863,7 +863,7 @@ const Research = () => {
                                                                                 <button
                                                                                     onClick={() => handlePromoteAd(ad)}
                                                                                     disabled={promotingAdId === ad.id}
-                                                                                    className="px-2 py-1 bg-amber-100 text-amber-700 rounded font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    className="px-2 py-1 bg-brand-100 text-brand-700 rounded font-medium hover:bg-brand-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                                     title="Analyzes this ad's structure with AI and adds it to your Winning Ads blueprint library"
                                                                                 >
                                                                                     {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
@@ -899,13 +899,13 @@ const Research = () => {
                     {verticalTab === 'search' && (
                         <div className="space-y-6">
                             {/* New Search Form */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <div className="bg-surface rounded-lg border border-border p-6">
                         <h3 className="text-lg font-semibold mb-4">New Search</h3>
                         <form onSubmit={handleScrape} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+                                <label className="block text-sm font-medium text-ink-secondary mb-2">Source</label>
                                 <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                    <label className="flex items-center gap-2 text-sm text-ink-secondary">
                                         <input
                                             type="radio"
                                             name="source"
@@ -915,7 +915,7 @@ const Research = () => {
                                         />
                                         Facebook Ad Library (free)
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                    <label className="flex items-center gap-2 text-sm text-ink-secondary">
                                         <input
                                             type="radio"
                                             name="source"
@@ -933,12 +933,12 @@ const Research = () => {
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
                                     placeholder="Search keyword (e.g. 'fitness', 'Nike')"
-                                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    className="flex-1 p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                                 />
                                 <select
                                     value={country}
                                     onChange={(e) => setCountry(e.target.value)}
-                                    className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                                    className="p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-surface"
                                 >
                                     {COUNTRIES.map((c) => (
                                         <option key={c.code} value={c.code}>
@@ -953,12 +953,12 @@ const Research = () => {
                                     value={negativeKeywords}
                                     onChange={(e) => setNegativeKeywords(e.target.value)}
                                     placeholder="Negative keywords (comma-separated)"
-                                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    className="flex-1 p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                                 />
                                 <select
                                     value={limit}
                                     onChange={(e) => setLimit(parseInt(e.target.value))}
-                                    className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                                    className="p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-surface"
                                 >
                                     {LIMIT_OPTIONS.map((opt) => (
                                         <option key={opt.value} value={opt.value}>
@@ -968,11 +968,11 @@ const Research = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Search Type</label>
+                                <label className="block text-sm font-medium text-ink-secondary mb-2">Search Type</label>
                                 <select
                                     value={searchType}
                                     onChange={(e) => setSearchType(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                                    className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-surface"
                                 >
                                     <option value="one_time">One-Time Search</option>
                                     <option value="scheduled_daily">Scheduled Daily</option>
@@ -982,32 +982,32 @@ const Research = () => {
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm space-y-2">
                                 {source === 'adplexity' ? (
                                     <div className="flex items-center justify-between">
-                                        <span className="text-gray-700">
+                                        <span className="text-ink-secondary">
                                             Estimated cost: <strong>~{estimateAdplexityCredits(limit)} credits</strong>
                                         </span>
-                                        <span className="text-gray-500">
+                                        <span className="text-ink-tertiary">
                                             (1 base + 1 per result returned, may be less if fewer results exist)
                                         </span>
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-between">
-                                        <span className="text-gray-700">
+                                        <span className="text-ink-secondary">
                                             API Calls: <strong>{LIMIT_OPTIONS.find(o => o.value === limit)?.apiCalls || 1}</strong>
                                         </span>
-                                        <span className="text-gray-500">
+                                        <span className="text-ink-tertiary">
                                             (Facebook Ads Library API limit: 300 ads/call)
                                         </span>
                                     </div>
                                 )}
                                 {source === 'facebook' && rateLimit && (
                                     <div className="flex items-center justify-between pt-2 border-t border-blue-200">
-                                        <span className="text-gray-700">
+                                        <span className="text-ink-secondary">
                                             Rate Limit: <strong className={rateLimit.remaining < 50 ? 'text-red-600' : 'text-green-600'}>
                                                 {rateLimit.remaining}/{rateLimit.limit}
                                             </strong> remaining
                                         </span>
                                         {rateLimit.reset_in_seconds > 0 && (
-                                            <span className="text-gray-500">
+                                            <span className="text-ink-tertiary">
                                                 Resets in {Math.ceil(rateLimit.reset_in_seconds / 60)} min
                                             </span>
                                         )}
@@ -1021,7 +1021,7 @@ const Research = () => {
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <span className="text-gray-700">{progressMessage}</span>
+                                        <span className="text-ink-secondary">{progressMessage}</span>
                                     </div>
                                 </div>
                             )}
@@ -1036,44 +1036,44 @@ const Research = () => {
                     </div>
 
                             {/* Saved Searches for this vertical */}
-                            <div className="bg-white rounded-lg border border-gray-200 p-6">
+                            <div className="bg-surface rounded-lg border border-border p-6">
                                 <h3 className="text-lg font-semibold mb-4">Saved Searches</h3>
                                 {savedSearches.filter(s => s.vertical_id === selectedVertical.id).length === 0 ? (
-                                    <p className="text-gray-500 text-center py-8">No searches yet for this vertical.</p>
+                                    <p className="text-ink-tertiary text-center py-8">No searches yet for this vertical.</p>
                                 ) : (
                                     <div className="space-y-4">
                                         {savedSearches.filter(s => s.vertical_id === selectedVertical.id).map((search) => (
                                             <div
                                                 key={search.id}
-                                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                                                className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
                                             >
                                                 <div className="flex justify-between items-start">
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h3 className="text-lg font-semibold text-gray-800">
+                                                            <h3 className="text-lg font-semibold text-ink">
                                                                 "{search.query}" in {search.country}
                                                             </h3>
                                                             {search.search_type !== 'one_time' && (
                                                                 <span className={`px-2 py-1 text-xs rounded ${
                                                                     search.search_type === 'scheduled_daily' ? 'bg-blue-100 text-blue-700' :
                                                                     search.search_type === 'scheduled_weekly' ? 'bg-purple-100 text-purple-700' :
-                                                                    'bg-gray-100 text-gray-700'
+                                                                    'bg-surface-hover text-ink-secondary'
                                                                 }`}>
                                                                     {search.search_type === 'scheduled_daily' ? 'Daily' :
                                                                      search.search_type === 'scheduled_weekly' ? 'Weekly' : search.search_type}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-sm text-gray-500 mt-1">
+                                                        <p className="text-sm text-ink-tertiary mt-1">
                                                             {search.ads?.length || 0} ads • {new Date(search.created_at).toLocaleString()}
                                                         </p>
                                                         {(search.ads_requested || search.ads_returned || search.ads_new || search.ads_duplicate) && (
-                                                            <p className="text-xs text-gray-400 mt-1">
+                                                            <p className="text-xs text-ink-tertiary mt-1">
                                                                 Requested: {search.ads_requested || 0} • Returned: {search.ads_returned || 0} • New: {search.ads_new || 0} • Duplicates: {search.ads_duplicate || 0}
                                                             </p>
                                                         )}
                                                         {search.negative_keywords && search.negative_keywords.length > 0 && (
-                                                            <p className="text-xs text-gray-400 mt-1">
+                                                            <p className="text-xs text-ink-tertiary mt-1">
                                                                 Excluded: {search.negative_keywords.join(', ')}
                                                             </p>
                                                         )}
@@ -1117,10 +1117,10 @@ const Research = () => {
                             >
                                 ← Back to Searches
                             </button>
-                            <h2 className="text-2xl font-bold text-gray-800">
+                            <h2 className="text-2xl font-bold text-ink">
                                 {selectedVertical.name} - All Ads
                             </h2>
-                            <p className="text-gray-600 mt-1">
+                            <p className="text-ink-secondary mt-1">
                                 Grouped by page
                             </p>
                         </div>
@@ -1182,24 +1182,24 @@ const Research = () => {
                         };
 
                         return pageGroups.length === 0 ? (
-                            <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-                                <p className="text-gray-500">No ads found in this vertical</p>
+                            <div className="text-center py-16 bg-surface rounded-lg border border-border">
+                                <p className="text-ink-tertiary">No ads found in this vertical</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
                                 {pageGroups.map(({ pageName, ads, totalAds }) => (
-                                    <div key={pageName} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                    <div key={pageName} className="bg-surface rounded-lg border border-border overflow-hidden">
                                         <button
                                             onClick={() => togglePage(pageName)}
-                                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-hover transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <span className="text-gray-400">
+                                                <span className="text-ink-tertiary">
                                                     {expandedPages.has(pageName) ? '▼' : '▶'}
                                                 </span>
                                                 <div className="text-left">
-                                                    <h3 className="font-semibold text-gray-900">{pageName}</h3>
-                                                    <p className="text-sm text-gray-500">{totalAds} unique ads</p>
+                                                    <h3 className="font-semibold text-ink">{pageName}</h3>
+                                                    <p className="text-sm text-ink-tertiary">{totalAds} unique ads</p>
                                                 </div>
                                             </div>
                                             <button
@@ -1214,26 +1214,26 @@ const Research = () => {
                                         </button>
 
                                         {expandedPages.has(pageName) && (
-                                            <div className="border-t border-gray-200">
+                                            <div className="border-t border-border">
                                                 <table className="min-w-full">
-                                                    <thead className="bg-gray-50">
+                                                    <thead className="bg-surface-hover">
                                                         <tr>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Headline</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ad Copy</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">CTA</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Searches</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Seen</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Headline</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Ad Copy</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">CTA</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Searches</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Seen</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Started</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-ink-tertiary uppercase">Actions</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-gray-200">
+                                                    <tbody className="divide-y divide-border">
                                                         {ads.map((ad) => (
-                                                            <tr key={ad.id} className="hover:bg-gray-50">
-                                                                <td className="px-4 py-2 text-sm text-gray-700 max-w-xs">
+                                                            <tr key={ad.id} className="hover:bg-surface-hover">
+                                                                <td className="px-4 py-2 text-sm text-ink-secondary max-w-xs">
                                                                     <div className="line-clamp-2">{ad.headline || '-'}</div>
                                                                 </td>
-                                                                <td className="px-4 py-2 text-sm text-gray-600 max-w-md">
+                                                                <td className="px-4 py-2 text-sm text-ink-secondary max-w-md">
                                                                     <div className="line-clamp-2">{ad.ad_copy || '-'}</div>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
@@ -1252,12 +1252,12 @@ const Research = () => {
                                                                         ))}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-4 py-2 text-sm text-gray-700 text-center">
+                                                                <td className="px-4 py-2 text-sm text-ink-secondary text-center">
                                                                     <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
                                                                         {ad.seen_count || 1}x
                                                                     </span>
                                                                 </td>
-                                                                <td className="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">
+                                                                <td className="px-4 py-2 text-sm text-ink-tertiary whitespace-nowrap">
                                                                     {ad.start_date ? new Date(ad.start_date).toLocaleDateString() : '-'}
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm whitespace-nowrap">
@@ -1276,7 +1276,7 @@ const Research = () => {
                                                                             <button
                                                                                 onClick={() => handlePromoteAd(ad)}
                                                                                 disabled={promotingAdId === ad.id}
-                                                                                className="text-amber-700 hover:text-amber-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                className="text-brand-700 hover:text-brand-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                                                                 title="Analyzes this ad's structure with AI and adds it to your Winning Ads blueprint library"
                                                                             >
                                                                                 {promotingAdId === ad.id ? 'Marking...' : '★ Mark as Winner'}
@@ -1309,7 +1309,7 @@ const Research = () => {
             {/* Vertical Modal */}
             {showVerticalModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
                         <h3 className="text-lg font-semibold mb-4">Add Vertical</h3>
                         <div className="space-y-4">
                             <input
@@ -1317,14 +1317,14 @@ const Research = () => {
                                 value={newVerticalName}
                                 onChange={(e) => setNewVerticalName(e.target.value)}
                                 placeholder="Vertical name (e.g., Legal, Fitness)"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                 autoFocus
                             />
                             <textarea
                                 value={newVerticalDescription}
                                 onChange={(e) => setNewVerticalDescription(e.target.value)}
                                 placeholder="Description (optional)"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                 rows="3"
                             />
                         </div>
@@ -1335,7 +1335,7 @@ const Research = () => {
                                     setNewVerticalName('');
                                     setNewVerticalDescription('');
                                 }}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                                className="flex-1 px-4 py-2 border border-border text-ink-secondary rounded hover:bg-surface-hover"
                             >
                                 Cancel
                             </button>
@@ -1353,14 +1353,14 @@ const Research = () => {
             {/* Delete Ad Confirmation Modal */}
             {adPendingDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
                                 🗑
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Remove this ad?</h3>
+                            <h3 className="text-lg font-semibold text-ink">Remove this ad?</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-6">
+                        <p className="text-sm text-ink-secondary mb-6">
                             {adPendingDelete.ad.headline || 'This ad'} will be permanently removed from your research dashboard. This can't be undone
                             {adPendingDelete.ad && promotedAdIds.has(adPendingDelete.ad.id)
                                 ? ' — its Winning Ads blueprint will stay intact.'
@@ -1370,7 +1370,7 @@ const Research = () => {
                             <button
                                 onClick={() => setAdPendingDelete(null)}
                                 disabled={deletingAdId === adPendingDelete.ad.id}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                                className="flex-1 px-4 py-2 border border-border text-ink-secondary rounded hover:bg-surface-hover disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -1389,14 +1389,14 @@ const Research = () => {
             {/* Delete Page Ads Confirmation Modal */}
             {pagePendingDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
                                 🗑
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Delete all ads from this page?</h3>
+                            <h3 className="text-lg font-semibold text-ink">Delete all ads from this page?</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-6">
+                        <p className="text-sm text-ink-secondary mb-6">
                             All {pagePendingDelete.total_ads} ad{pagePendingDelete.total_ads === 1 ? '' : 's'} scraped from <strong>{pagePendingDelete.page_name}</strong> in
                             this vertical will be permanently removed from your research dashboard. This can't be undone — any already-promoted
                             Winning Ads blueprints will stay intact. This doesn't stop future scrapes from returning this page again; use Block Page for that.
@@ -1405,7 +1405,7 @@ const Research = () => {
                             <button
                                 onClick={() => setPagePendingDelete(null)}
                                 disabled={deletingPageId === pagePendingDelete.page_id}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                                className="flex-1 px-4 py-2 border border-border text-ink-secondary rounded hover:bg-surface-hover disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -1424,14 +1424,14 @@ const Research = () => {
             {/* Batch Delete Pages Confirmation Modal */}
             {batchDeletePending && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0">
                                 🗑
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Delete ads from {selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'}?</h3>
+                            <h3 className="text-lg font-semibold text-ink">Delete ads from {selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'}?</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-6">
+                        <p className="text-sm text-ink-secondary mb-6">
                             All {aggregatedAds.filter(p => selectedPageIds.has(p.page_id)).reduce((sum, p) => sum + p.total_ads, 0)} ads
                             scraped from these {selectedPageIds.size} page{selectedPageIds.size === 1 ? '' : 's'} in this vertical will be permanently removed
                             from your research dashboard. This can't be undone — any already-promoted Winning Ads blueprints will stay intact.
@@ -1440,7 +1440,7 @@ const Research = () => {
                             <button
                                 onClick={() => setBatchDeletePending(false)}
                                 disabled={batchDeleting}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50"
+                                className="flex-1 px-4 py-2 border border-border text-ink-secondary rounded hover:bg-surface-hover disabled:opacity-50"
                             >
                                 Cancel
                             </button>

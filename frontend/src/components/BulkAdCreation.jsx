@@ -262,7 +262,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6">Bulk Ad Creation</h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-ink-secondary mb-6">
                 Add multiple ads to be created with the same creative structure. Each ad will use the dynamic creative you configured.
             </p>
 
@@ -302,10 +302,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             const creative = creativeData.creatives?.find(c => c.id === ad.creativeId);
                             const isVideo = creative?.mediaType === 'video';
                             return (
-                                <div key={ad.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <div key={ad.id} className="flex items-center gap-3 p-4 bg-surface-hover rounded-lg border border-border">
                                     {/* Thumbnail */}
                                     {creative && (
-                                        <div className="w-12 h-12 rounded overflow-hidden bg-gray-200 flex-shrink-0 relative">
+                                        <div className="w-12 h-12 rounded overflow-hidden bg-border flex-shrink-0 relative">
                                             {isVideo ? (
                                                 <>
                                                     <video
@@ -337,7 +337,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                                             value={ad.name}
                                             onChange={(e) => updateAdName(index, e.target.value)}
                                             placeholder={`Ad ${index + 1} name`}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         />
                                     </div>
                                     <button
@@ -354,7 +354,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     {/* Add Ad Button */}
                     <button
                         onClick={addAd}
-                        className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                        className="w-full p-4 border-2 border-dashed border-border rounded-lg text-ink-secondary hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
                     >
                         <Plus size={20} />
                         Add Another Ad
@@ -376,14 +376,14 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     <div className="mt-8 flex justify-between">
                         <button
                             onClick={onBack}
-                            className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
+                            className="px-6 py-3 text-ink-secondary hover:text-ink font-medium"
                         >
                             Back
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={adsData.length === 0}
-                            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-border disabled:cursor-not-allowed"
                         >
                             Create {adsData.length} Ad{adsData.length !== 1 ? 's' : ''} on Facebook
                         </button>
@@ -395,13 +395,13 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     <div className="text-center py-12">
                         <Loader className="animate-spin mx-auto mb-4 text-blue-600" size={48} />
                         <h3 className="text-xl font-semibold mb-2">{progress.status}</h3>
-                        <div className="w-full max-w-md mx-auto bg-gray-200 rounded-full h-3 mb-2">
+                        <div className="w-full max-w-md mx-auto bg-border rounded-full h-3 mb-2">
                             <div
                                 className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
                             />
                         </div>
-                        <p className="text-gray-600">
+                        <p className="text-ink-secondary">
                             {progress.current} of {progress.total} ads created
                         </p>
                     </div>

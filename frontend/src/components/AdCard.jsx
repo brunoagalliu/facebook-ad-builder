@@ -69,12 +69,12 @@ const AdCard = ({ ad, onSave }) => {
         // If media failed to load, show fallback
         if (mediaError) {
             return (
-                <div className="w-full min-h-[200px] max-h-[400px] flex items-center justify-center bg-gray-50">
+                <div className="w-full min-h-[200px] max-h-[400px] flex items-center justify-center bg-surface-hover">
                     <div className="text-center">
-                        <svg className="w-10 h-10 text-gray-300 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10 text-border mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/>
                         </svg>
-                        <span className="text-gray-400 text-xs">View on Facebook</span>
+                        <span className="text-ink-tertiary text-xs">View on Facebook</span>
                     </div>
                 </div>
             );
@@ -106,7 +106,7 @@ const AdCard = ({ ad, onSave }) => {
                     <img
                         src={ad.image_url}
                         alt={ad.brand_name}
-                        className="w-full max-h-[400px] object-contain bg-gray-100"
+                        className="w-full max-h-[400px] object-contain bg-surface-hover"
                         onError={() => setMediaError(true)}
                     />
                     {/* Show video badge if this is a video ad with only thumbnail */}
@@ -124,19 +124,19 @@ const AdCard = ({ ad, onSave }) => {
 
         // Fallback - no media available
         return (
-            <div className="w-full min-h-[200px] max-h-[400px] flex items-center justify-center bg-gray-50">
+            <div className="w-full min-h-[200px] max-h-[400px] flex items-center justify-center bg-surface-hover">
                 <div className="text-center">
-                    <svg className="w-10 h-10 text-gray-300 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10 text-border mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/>
                     </svg>
-                    <span className="text-gray-400 text-xs">View on Facebook</span>
+                    <span className="text-ink-tertiary text-xs">View on Facebook</span>
                 </div>
             </div>
         );
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+        <div className="bg-surface rounded-lg shadow-sm border border-border overflow-hidden hover:shadow-md transition-shadow">
             {/* Header - Brand info (like Facebook) */}
             <div className="px-3 pt-3 pb-2">
                 <div className="flex items-center gap-2">
@@ -144,15 +144,15 @@ const AdCard = ({ ad, onSave }) => {
                         {ad.brand_name?.charAt(0)?.toUpperCase() || 'A'}
                     </div>
                     <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-[15px] truncate leading-tight">{ad.brand_name}</h3>
-                        <p className="text-xs text-gray-500">Sponsored</p>
+                        <h3 className="font-semibold text-ink text-[15px] truncate leading-tight">{ad.brand_name}</h3>
+                        <p className="text-xs text-ink-tertiary">Sponsored</p>
                     </div>
                 </div>
             </div>
 
             {/* Body Copy */}
             <div className="px-3 pb-2">
-                <p className="text-[15px] text-gray-900 leading-snug whitespace-pre-line line-clamp-4">
+                <p className="text-[15px] text-ink leading-snug whitespace-pre-line line-clamp-4">
                     {cleanCopy || 'No copy available'}
                 </p>
             </div>
@@ -169,13 +169,13 @@ const AdCard = ({ ad, onSave }) => {
             </a>
 
             {/* Link Preview Footer (like Facebook ads) */}
-            <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
+            <div className="px-3 py-2 bg-surface-hover border-t border-border">
                 <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                        <p className="text-xs text-gray-500 uppercase tracking-wide truncate">
+                        <p className="text-xs text-ink-tertiary uppercase tracking-wide truncate">
                             {ad.platform || 'facebook'}.com
                         </p>
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-ink truncate">
                             {ad.cta_text || 'Learn More'}
                         </p>
                     </div>
@@ -183,7 +183,7 @@ const AdCard = ({ ad, onSave }) => {
                         href={previewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium rounded transition-colors flex-shrink-0"
+                        className="px-4 py-1.5 bg-border hover:bg-border text-ink text-sm font-medium rounded transition-colors flex-shrink-0"
                     >
                         {ad.cta_text || 'Learn more'}
                     </a>
@@ -191,9 +191,9 @@ const AdCard = ({ ad, onSave }) => {
             </div>
 
             {/* Actions Footer */}
-            <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between">
+            <div className="px-3 py-2 border-t border-border flex items-center justify-between">
                 {analysis.start_date && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-ink-tertiary">
                         Started {analysis.start_date}
                     </span>
                 )}

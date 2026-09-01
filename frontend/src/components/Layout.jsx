@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, BarChart2, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Layout() {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout, hasRole } = useAuth();
     const { showSuccess } = useToast();
+    const { theme, toggleTheme } = useTheme();
     const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false });
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -54,26 +56,26 @@ export default function Layout() {
     };
 
     return (
-        <div className="flex h-screen bg-[#FFFAF0]">
+        <div className="flex h-screen bg-background">
             {/* Sidebar */}
-            <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-amber-200 flex flex-col shadow-sm transition-all duration-300 ease-in-out relative`}>
+            <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-surface border-r border-border flex flex-col shadow-sm transition-all duration-300 ease-in-out relative`}>
                 {/* Toggle Button */}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="absolute -right-3 top-9 bg-white border border-amber-200 rounded-full p-1 shadow-sm hover:bg-amber-50 text-amber-600 z-10"
+                    className="absolute -right-3 top-9 bg-surface border border-border rounded-full p-1 shadow-sm hover:bg-surface-hover text-ink-secondary z-10"
                 >
                     {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                 </button>
 
-                <div className={`p-6 border-b border-amber-100 ${isCollapsed ? 'px-4' : ''}`}>
+                <div className={`p-6 border-b border-border ${isCollapsed ? 'px-4' : ''}`}>
                     <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0 p-1">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden border border-border flex-shrink-0 p-1">
                             <img src="/unwavering_logo.png" alt="UnwaveringMedia Logo" className="w-full h-full object-contain" />
                         </div>
                         {!isCollapsed && (
                             <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold text-amber-900">Unwavering</h1>
-                                <p className="text-xs text-amber-600">AI-Powered Ad Automation</p>
+                                <h1 className="text-xl font-bold text-ink">Unwavering</h1>
+                                <p className="text-xs text-brand-600 dark:text-brand-400">AI-Powered Ad Automation</p>
                             </div>
                         )}
                     </div>
@@ -99,12 +101,12 @@ export default function Layout() {
                                             }
                                         }}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                            ? 'bg-amber-50 text-amber-900 font-medium'
-                                            : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
+                                            ? 'bg-brand-50 text-brand-900 font-medium dark:bg-brand-900/30 dark:text-brand-200'
+                                            : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                                             } ${isCollapsed ? 'justify-center px-2' : ''}`}
                                         title={isCollapsed ? item.label : ''}
                                     >
-                                        <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'}`} />
+                                        <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-tertiary group-hover:text-brand-600 dark:group-hover:text-brand-400'}`} />
                                         {!isCollapsed && (
                                             <>
                                                 <span className="flex-1 text-left whitespace-nowrap overflow-hidden">{item.label}</span>
@@ -123,8 +125,8 @@ export default function Layout() {
                                                         key={subItem.path}
                                                         to={subItem.path}
                                                         className={`block px-3 py-2 rounded-lg text-sm transition-colors ${isSubActive
-                                                            ? 'text-amber-700 bg-amber-50 font-medium'
-                                                            : 'text-gray-500 hover:text-amber-700 hover:bg-amber-50'
+                                                            ? 'text-brand-700 bg-brand-50 font-medium dark:text-brand-300 dark:bg-brand-900/30'
+                                                            : 'text-ink-tertiary hover:text-brand-700 hover:bg-surface-hover dark:hover:text-brand-300'
                                                             }`}
                                                     >
                                                         {subItem.label}
@@ -144,34 +146,34 @@ export default function Layout() {
                                 key={item.path}
                                 to={item.path}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                    ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                    : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
+                                    ? 'bg-brand-100 text-brand-900 font-medium shadow-sm dark:bg-brand-900/40 dark:text-brand-200'
+                                    : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                                     } ${isCollapsed ? 'justify-center px-2' : ''}`}
                                 title={isCollapsed ? item.label : ''}
                             >
-                                <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'}`} />
+                                <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-tertiary group-hover:text-brand-600 dark:group-hover:text-brand-400'}`} />
                                 {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}
                             </Link>
                         );
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-amber-100">
+                <div className="p-4 border-t border-border">
                     {/* User Management - Admin Only */}
                     {hasRole('admin') && (
                         <Link
                             to="/users"
                             className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors group ${
                                 location.pathname === '/users'
-                                    ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                    : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
+                                    ? 'bg-brand-100 text-brand-900 font-medium shadow-sm dark:bg-brand-900/40 dark:text-brand-200'
+                                    : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                             } ${isCollapsed ? 'justify-center px-2' : ''}`}
                             title={isCollapsed ? 'User Management' : ''}
                         >
                             <UserCog size={20} className={`flex-shrink-0 ${
                                 location.pathname === '/users'
-                                    ? 'text-amber-600'
-                                    : 'text-gray-400 group-hover:text-amber-600'
+                                    ? 'text-brand-600 dark:text-brand-400'
+                                    : 'text-ink-tertiary group-hover:text-brand-600 dark:group-hover:text-brand-400'
                             }`} />
                             {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">User Management</span>}
                         </Link>
@@ -180,32 +182,41 @@ export default function Layout() {
                         to="/settings"
                         className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors group ${
                             location.pathname === '/settings'
-                                ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
+                                ? 'bg-brand-100 text-brand-900 font-medium shadow-sm dark:bg-brand-900/40 dark:text-brand-200'
+                                : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                         } ${isCollapsed ? 'justify-center px-2' : ''}`}
                         title={isCollapsed ? 'Settings' : ''}
                     >
                         <Settings size={20} className={`flex-shrink-0 ${
                             location.pathname === '/settings'
-                                ? 'text-amber-600'
-                                : 'text-gray-400 group-hover:text-amber-600'
+                                ? 'text-brand-600 dark:text-brand-400'
+                                : 'text-ink-tertiary group-hover:text-brand-600 dark:group-hover:text-brand-400'
                         }`} />
                         {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">Settings</span>}
                     </Link>
 
+                    <button
+                        onClick={toggleTheme}
+                        className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors text-ink-secondary hover:bg-surface-hover hover:text-ink ${isCollapsed ? 'justify-center px-2' : ''}`}
+                        title={isCollapsed ? (theme === 'dark' ? 'Light Mode' : 'Dark Mode') : ''}
+                    >
+                        {theme === 'dark' ? <Sun size={20} className="flex-shrink-0" /> : <Moon size={20} className="flex-shrink-0" />}
+                        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+                    </button>
+
                     {/* User Info */}
                     {!isCollapsed && user && (
-                        <div className="px-4 py-3 mt-2 bg-amber-50 rounded-xl">
-                            <div className="text-sm font-medium text-amber-900 truncate">
+                        <div className="px-4 py-3 mt-2 bg-surface-hover rounded-xl">
+                            <div className="text-sm font-medium text-ink truncate">
                                 {user.name || user.email}
                             </div>
-                            <div className="text-xs text-amber-600 truncate">{user.email}</div>
+                            <div className="text-xs text-ink-secondary truncate">{user.email}</div>
                         </div>
                     )}
 
                     <button
                         onClick={handleLogout}
-                        className={`flex items-center gap-3 px-4 py-3 w-full text-red-600 hover:bg-red-50 rounded-xl transition-colors mt-1 ${isCollapsed ? 'justify-center px-2' : ''}`}
+                        className={`flex items-center gap-3 px-4 py-3 w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors mt-1 ${isCollapsed ? 'justify-center px-2' : ''}`}
                         title={isCollapsed ? 'Logout' : ''}
                     >
                         <LogOut size={20} className="flex-shrink-0" />

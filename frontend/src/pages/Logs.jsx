@@ -29,7 +29,7 @@ function formatBalance(balance, unit) {
 const STATUS_BADGE = {
     success: { icon: CheckCircle2, className: 'bg-green-50 text-green-700 border-green-200' },
     error: { icon: XCircle, className: 'bg-red-50 text-red-700 border-red-200' },
-    pending: { icon: Loader, className: 'bg-amber-50 text-amber-700 border-amber-200' },
+    pending: { icon: Loader, className: 'bg-brand-50 text-brand-700 border-brand-200' },
 };
 
 function StatusBadge({ status }) {
@@ -98,15 +98,15 @@ const Logs = () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                        <BarChart size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-ink mb-2 flex items-center gap-3">
+                        <BarChart size={32} className="text-brand-600" />
                         AI Generation Logs
                     </h1>
-                    <p className="text-gray-600">Cost, duration, and provider balances for image/video ad generation</p>
+                    <p className="text-ink-secondary">Cost, duration, and provider balances for image/video ad generation</p>
                 </div>
                 <button
                     onClick={fetchAll}
-                    className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                    className="p-2 text-ink-tertiary hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                     title="Refresh"
                 >
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -116,17 +116,17 @@ const Logs = () => {
             {/* Provider Balance Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {balances.map((b) => (
-                    <div key={b.provider} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <div key={b.provider} className="bg-surface p-6 rounded-xl border border-border shadow-sm">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 rounded-lg bg-amber-50">
-                                <CreditCard className="text-amber-600" size={24} />
+                            <div className="p-3 rounded-lg bg-brand-50">
+                                <CreditCard className="text-brand-600" size={24} />
                             </div>
                             {b.error && <span className="text-xs text-red-500">{b.error}</span>}
                         </div>
-                        <h3 className="text-gray-500 text-sm font-medium">
+                        <h3 className="text-ink-tertiary text-sm font-medium">
                             {b.provider === 'kie' ? 'Kie.ai Balance' : 'Fal.ai Balance'}
                         </h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{formatBalance(b.balance, b.unit)}</p>
+                        <p className="text-2xl font-bold text-ink mt-1">{formatBalance(b.balance, b.unit)}</p>
                     </div>
                 ))}
             </div>
@@ -134,40 +134,40 @@ const Logs = () => {
             {/* Summary Stats */}
             {summary && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-gray-500 text-sm font-medium">Total Generations</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{summary.total}</p>
+                    <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
+                        <h3 className="text-ink-tertiary text-sm font-medium">Total Generations</h3>
+                        <p className="text-2xl font-bold text-ink mt-1">{summary.total}</p>
                     </div>
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-gray-500 text-sm font-medium">Success Rate</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
+                        <h3 className="text-ink-tertiary text-sm font-medium">Success Rate</h3>
+                        <p className="text-2xl font-bold text-ink mt-1">
                             {summary.success_rate != null ? `${(summary.success_rate * 100).toFixed(0)}%` : '—'}
                         </p>
                     </div>
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-gray-500 text-sm font-medium">Kie.ai Credits Spent</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
+                        <h3 className="text-ink-tertiary text-sm font-medium">Kie.ai Credits Spent</h3>
+                        <p className="text-2xl font-bold text-ink mt-1">
                             {summary.total_kie_credits_spent != null ? summary.total_kie_credits_spent.toFixed(1) : '—'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">Fal.ai cost isn't tracked per-call</p>
+                        <p className="text-xs text-ink-tertiary mt-1">Fal.ai cost isn't tracked per-call</p>
                     </div>
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
                         <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-gray-400" />
-                            <h3 className="text-gray-500 text-sm font-medium">Avg Duration</h3>
+                            <Clock size={16} className="text-ink-tertiary" />
+                            <h3 className="text-ink-tertiary text-sm font-medium">Avg Duration</h3>
                         </div>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{formatDuration(summary.avg_duration_ms)}</p>
+                        <p className="text-2xl font-bold text-ink mt-1">{formatDuration(summary.avg_duration_ms)}</p>
                     </div>
                 </div>
             )}
 
             {/* Filters + Table */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div className="p-6 border-b border-gray-100 flex flex-wrap gap-3">
+            <div className="bg-surface rounded-xl border border-border shadow-sm">
+                <div className="p-6 border-b border-border flex flex-wrap gap-3">
                     <select
                         value={filters.media_type}
                         onChange={(e) => updateFilter('media_type', e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     >
                         <option value="">All Media Types</option>
                         <option value="image">Image</option>
@@ -176,7 +176,7 @@ const Logs = () => {
                     <select
                         value={filters.provider}
                         onChange={(e) => updateFilter('provider', e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     >
                         <option value="">All Providers</option>
                         <option value="kie">Kie.ai</option>
@@ -185,7 +185,7 @@ const Logs = () => {
                     <select
                         value={filters.status}
                         onChange={(e) => updateFilter('status', e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     >
                         <option value="">All Statuses</option>
                         <option value="success">Success</option>
@@ -197,7 +197,7 @@ const Logs = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="text-left text-gray-500 border-b border-gray-100">
+                            <tr className="text-left text-ink-tertiary border-b border-border">
                                 <th className="px-6 py-3 font-medium">Timestamp</th>
                                 <th className="px-6 py-3 font-medium">Type</th>
                                 <th className="px-6 py-3 font-medium">Provider</th>
@@ -211,32 +211,32 @@ const Logs = () => {
                         <tbody>
                             {logs.length === 0 && !loading && (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={8} className="px-6 py-12 text-center text-ink-tertiary">
                                         No generations logged yet
                                     </td>
                                 </tr>
                             )}
                             {logs.map((log) => (
-                                <tr key={log.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                                    <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
+                                <tr key={log.id} className="border-b border-border last:border-0 hover:bg-surface-hover">
+                                    <td className="px-6 py-3 text-ink-secondary whitespace-nowrap">
                                         {new Date(log.started_at).toLocaleString()}
                                     </td>
                                     <td className="px-6 py-3 capitalize">{log.media_type}</td>
-                                    <td className="px-6 py-3 uppercase text-xs font-semibold text-gray-500">{log.provider}</td>
-                                    <td className="px-6 py-3 text-gray-600">{log.model}</td>
+                                    <td className="px-6 py-3 uppercase text-xs font-semibold text-ink-tertiary">{log.provider}</td>
+                                    <td className="px-6 py-3 text-ink-secondary">{log.model}</td>
                                     <td className="px-6 py-3">
                                         <StatusBadge status={log.status} />
                                     </td>
-                                    <td className="px-6 py-3 text-gray-600">{formatDuration(log.duration_ms)}</td>
-                                    <td className="px-6 py-3 text-gray-600">{formatCost(log.cost_amount, log.provider)}</td>
-                                    <td className="px-6 py-3 text-gray-600">{log.brand_name || '—'}</td>
+                                    <td className="px-6 py-3 text-ink-secondary">{formatDuration(log.duration_ms)}</td>
+                                    <td className="px-6 py-3 text-ink-secondary">{formatCost(log.cost_amount, log.provider)}</td>
+                                    <td className="px-6 py-3 text-ink-secondary">{log.brand_name || '—'}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
 
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 text-sm text-gray-600">
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border text-sm text-ink-secondary">
                     <span>
                         Page {page + 1} of {totalPages} ({total} total)
                     </span>
@@ -244,14 +244,14 @@ const Logs = () => {
                         <button
                             onClick={() => setPage((p) => Math.max(0, p - 1))}
                             disabled={page === 0}
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                            className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-hover"
                         >
                             Previous
                         </button>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                             disabled={page >= totalPages - 1}
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                            className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-hover"
                         >
                             Next
                         </button>
