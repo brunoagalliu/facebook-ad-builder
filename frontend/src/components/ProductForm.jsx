@@ -20,6 +20,11 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
     });
     const [uploading, setUploading] = useState(false);
     const [capturingScreenshot, setCapturingScreenshot] = useState(false);
+    // Separate from formData.default_url deliberately — that field is the product's
+    // saved main link. Capturing a second funnel step (e.g. the actual form page, or a
+    // thank-you page) needs its own URL without overwriting the saved one every time.
+    // Seeded from default_url since the first capture usually is the landing page.
+    const [captureUrl, setCaptureUrl] = useState(initialData?.default_url || '');
     const [saving, setSaving] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -109,7 +114,7 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
             const response = await authFetch(`${API_URL}/uploads/screenshot`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: formData.default_url })
+                body: JSON.stringify({ url: captureUrl })
             });
 
             if (!response.ok) {
@@ -204,16 +209,30 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                             className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             placeholder="https://example.com/signup"
                         />
-                        <button
-                            type="button"
-                            onClick={handleCaptureScreenshot}
-                            disabled={!formData.default_url || capturingScreenshot}
-                            className="mt-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                        >
-                            {capturingScreenshot ? <Loader size={14} className="animate-spin" /> : <Camera size={14} />}
-                            {capturingScreenshot ? 'Capturing...' : 'Capture Screenshot'}
-                        </button>
-                        <p className="text-xs text-gray-500 mt-1">Screenshots the real signup form so generated ads can reference it as a product shot below.</p>
+                        <p className="text-xs text-gray-500 mt-1">The product's main link.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Capture a Screenshot</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="url"
+                                value={captureUrl}
+                                onChange={e => setCaptureUrl(e.target.value)}
+                                className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="https://example.com/signup"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCaptureScreenshot}
+                                disabled={!captureUrl || capturingScreenshot}
+                                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                            >
+                                {capturingScreenshot ? <Loader size={14} className="animate-spin" /> : <Camera size={14} />}
+                                {capturingScreenshot ? 'Capturing...' : 'Capture'}
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Enter any URL from the funnel (landing page, form, thank-you page) and capture — repeat for as many steps as you need. Each capture adds a real screenshot to the Product Shots below, independent of the Landing Page URL above.</p>
                     </div>
 
                     <div>
