@@ -47,13 +47,15 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
         if (productId && !formData.products.find(p => p.id === productId)) {
             const product = allProducts.find(p => p.id === productId);
             if (product) {
+                // Preserve every real product field (product_shots, default_url, etc.) —
+                // hand-picking a field subset here is what silently wiped product_shots
+                // back to [] on save, since brands.ts writes back whatever this object
+                // contains. Only strip brandName/brandId, which allProducts added above
+                // and aren't real Product fields.
+                const { brandName, brandId, ...productData } = product;
                 setFormData({
                     ...formData,
-                    products: [...formData.products, {
-                        id: product.id,
-                        name: product.name,
-                        description: product.description
-                    }]
+                    products: [...formData.products, productData]
                 });
             }
         }
