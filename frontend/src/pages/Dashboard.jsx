@@ -1,7 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag, AlertTriangle, CheckCircle2, XCircle, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+function timeAgo(isoString) {
+    const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+const ACTIVITY_STATUS = {
+    success: { icon: CheckCircle2, className: 'text-green-600 dark:text-green-400' },
+    error: { icon: XCircle, className: 'text-red-600 dark:text-red-400' },
+    pending: { icon: Loader, className: 'text-brand-600 dark:text-brand-400 animate-spin' },
+};
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -15,6 +32,8 @@ export default function Dashboard() {
         campaigns_count: 0
     });
     const [tokenStatus, setTokenStatus] = useState(null);
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [activityLoading, setActivityLoading] = useState(true);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -40,8 +59,23 @@ export default function Dashboard() {
             }
         };
 
+        const fetchRecentActivity = async () => {
+            try {
+                const response = await authFetch(`${API_URL}/ai-usage/logs?limit=5`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setRecentActivity(data.logs);
+                }
+            } catch (error) {
+                console.error('Failed to fetch recent activity:', error);
+            } finally {
+                setActivityLoading(false);
+            }
+        };
+
         fetchStats();
         fetchTokenStatus();
+        fetchRecentActivity();
     }, [authFetch]);
 
     const tokenWarningMessage = () => {
@@ -134,12 +168,46 @@ export default function Dashboard() {
 
             {/* Recent Activity */}
             <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
-                <h2 className="text-xl font-bold text-ink mb-4">Recent Activity</h2>
-                <div className="text-center py-12 text-ink-tertiary">
-                    <Zap size={48} className="mx-auto mb-4 text-ink-tertiary" />
-                    <p>No recent activity yet</p>
-                    <p className="text-sm mt-2">Start creating ads to see your activity here</p>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
+                    {recentActivity.length > 0 && (
+                        <Link to="/logs" className="text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                            View all
+                        </Link>
+                    )}
                 </div>
+                {activityLoading ? (
+                    <div className="text-center py-12 text-ink-tertiary">Loading...</div>
+                ) : recentActivity.length === 0 ? (
+                    <div className="text-center py-12 text-ink-tertiary">
+                        <Zap size={48} className="mx-auto mb-4 text-ink-tertiary" />
+                        <p>No recent activity yet</p>
+                        <p className="text-sm mt-2">Start creating ads to see your activity here</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-border">
+                        {recentActivity.map((item) => {
+                            const MediaIcon = item.media_type === 'video' ? Video : Image;
+                            const status = ACTIVITY_STATUS[item.status] || ACTIVITY_STATUS.pending;
+                            const StatusIcon = status.icon;
+                            return (
+                                <div key={item.id} className="flex items-center gap-4 py-3">
+                                    <div className="bg-surface-hover w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <MediaIcon size={16} className="text-ink-secondary" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-ink truncate">
+                                            {item.media_type === 'video' ? 'Video ad' : 'Image ad'} generated
+                                            {item.brand_name ? ` for ${item.brand_name}` : ''}
+                                        </p>
+                                        <p className="text-xs text-ink-tertiary">{item.model} &middot; {timeAgo(item.started_at)}</p>
+                                    </div>
+                                    <StatusIcon size={18} className={`flex-shrink-0 ${status.className}`} />
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
