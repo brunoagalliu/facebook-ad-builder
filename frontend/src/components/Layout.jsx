@@ -43,7 +43,7 @@ export default function Layout() {
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'Generated Ads', path: '/generated-ads' },
         { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
-        { icon: BarChart2, label: 'Reporting', path: '/reporting' },
+        { icon: BarChart2, label: 'Logs', path: '/logs' },
     ];
 
     const toggleMenu = (label) => {

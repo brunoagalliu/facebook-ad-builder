@@ -43,7 +43,7 @@ function StatusBadge({ status }) {
     );
 }
 
-const Reporting = () => {
+const Logs = () => {
     const { authFetch } = useAuth();
     const [balances, setBalances] = useState([]);
     const [summary, setSummary] = useState(null);
@@ -100,7 +100,7 @@ const Reporting = () => {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
                         <BarChart size={32} className="text-amber-600" />
-                        AI Generation Reporting
+                        AI Generation Logs
                     </h1>
                     <p className="text-gray-600">Cost, duration, and provider balances for image/video ad generation</p>
                 </div>
@@ -262,4 +262,4 @@ const Reporting = () => {
     );
 };
 
-export default Reporting;
+export default Logs;
