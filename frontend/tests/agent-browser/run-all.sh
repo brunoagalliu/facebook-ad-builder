@@ -28,11 +28,11 @@ run_test() {
 
   if bash "$test_script"; then
     echo ""
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
   else
     echo ""
     echo "FAILED: $test_name"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
   fi
 }
 
