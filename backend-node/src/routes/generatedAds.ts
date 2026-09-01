@@ -13,6 +13,7 @@ import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideo
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "../services/blueprintSynthesisService";
 import { generateImages } from "../services/imageGenerationService";
 import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
+import { finalizeVideoGenerationLog } from "../services/aiUsageService";
 import { serialize as serializeWinningAd } from "./templates";
 
 const router = Router();
@@ -155,8 +156,12 @@ router.get(
       const status = await getVideoTaskStatus(req.params.taskId);
       if (status.state === "success" && status.resultUrl) {
         const videoUrl = await downloadAndSaveVideo(status.resultUrl);
+        await finalizeVideoGenerationLog(req.params.taskId, { status: "success" });
         res.json({ state: status.state, video_url: videoUrl });
         return;
+      }
+      if (status.state === "fail") {
+        await finalizeVideoGenerationLog(req.params.taskId, { status: "error", errorMessage: status.failMsg });
       }
       res.json({ state: status.state, progress: status.progress, detail: status.failMsg });
     } catch (err) {

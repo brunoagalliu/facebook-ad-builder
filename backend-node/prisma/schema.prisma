@@ -86,10 +86,11 @@ model Brand {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
-  products     Product[]
-  profiles     CustomerProfile[] @relation("BrandProfiles")
-  generatedAds GeneratedAd[]
-  vertical     Vertical?         @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  products         Product[]
+  profiles         CustomerProfile[] @relation("BrandProfiles")
+  generatedAds     GeneratedAd[]
+  vertical         Vertical?         @relation(fields: [verticalId], references: [id], onDelete: SetNull)
+  aiGenerationLogs AiGenerationLog[]
 
   @@map("brands")
 }
@@ -274,10 +275,41 @@ model GeneratedAd {
   thumbnailUrl String?  @map("thumbnail_url")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  brand    Brand?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  template WinningAd? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  brand            Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  template         WinningAd?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  aiGenerationLogs AiGenerationLog[]
 
   @@map("generated_ads")
+}
+
+// Per-call cost/duration record for image and video ad generation (Kie.ai + Fal.ai).
+// Video generation is async (createTask returns fast, completion is detected later via
+// polling), so a row can sit at status="pending" between creation and finalization —
+// see aiUsageService.ts's start/attachTaskId/finalize split.
+model AiGenerationLog {
+  id            String    @id @default(uuid())
+  mediaType     String    @map("media_type") // "image" | "video"
+  provider      String // "kie" | "fal"
+  model         String
+  status        String    @default("pending") // "pending" | "success" | "error"
+  taskId        String?   @map("task_id") // Kie.ai taskId — video's async finalize lookup key
+  brandId       String?   @map("brand_id")
+  generatedAdId String?   @map("generated_ad_id")
+  balanceBefore Float?    @map("balance_before") // native unit per provider (kie=credits, fal=usd)
+  balanceAfter  Float?    @map("balance_after")
+  costAmount    Float?    @map("cost_amount") // balanceBefore - balanceAfter; null if unmeasurable
+  durationMs    Int?      @map("duration_ms")
+  errorMessage  String?   @map("error_message")
+  startedAt     DateTime  @default(now()) @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+
+  brand       Brand?       @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  generatedAd GeneratedAd? @relation(fields: [generatedAdId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("ai_generation_logs")
 }
 
 // ---------- Research / competitor scraping ----------

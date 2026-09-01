@@ -19,6 +19,7 @@ import { randomUUID } from "crypto";
 import { settings } from "../core/config";
 import { ImageGenerationRequestInput } from "../schemas/generatedAd";
 import { uploadToLocal } from "./storage";
+import { logImageGeneration } from "./aiUsageService";
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
 const KIE_POLL_INTERVAL_MS = 3000;
@@ -206,6 +207,7 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
   const images: GeneratedImage[] = [];
   const useKie = Boolean(settings.KIE_AI_API_KEY) && request.model !== "imagen4";
   const useFal = Boolean(settings.FAL_AI_API_KEY);
+  const brandId = (request.brand as Record<string, unknown> | undefined)?.id as string | undefined;
 
   if (useFal) {
     fal.config({ credentials: settings.FAL_AI_API_KEY });
@@ -223,8 +225,15 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
 
       if (useKie) {
         try {
-          const externalUrl = await generateViaKie(prompt, aspectRatio, request.resolution, imageInput);
-          const imageUrl = await downloadAndSaveImage(externalUrl, "generated");
+          const imageUrl = await logImageGeneration({
+            provider: "kie",
+            model: "nano-banana-pro",
+            brandId,
+            run: async () => {
+              const externalUrl = await generateViaKie(prompt, aspectRatio, request.resolution, imageInput);
+              return downloadAndSaveImage(externalUrl, "generated");
+            },
+          });
           images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
         } catch (err) {
           console.error("Kie.ai generation failed:", err);
@@ -254,10 +263,17 @@ export async function generateImages(request: ImageGenerationRequestInput): Prom
             args = { prompt, image_size: { width, height } };
           }
 
-          const result = await fal.subscribe(modelId as never, { input: args as never });
-          const data = result.data as { images: { url: string }[] };
-          const externalUrl = data.images[0].url;
-          const imageUrl = await downloadAndSaveImage(externalUrl, "generated");
+          const imageUrl = await logImageGeneration({
+            provider: "fal",
+            model: modelId,
+            brandId,
+            run: async () => {
+              const result = await fal.subscribe(modelId as never, { input: args as never });
+              const data = result.data as { images: { url: string }[] };
+              const externalUrl = data.images[0].url;
+              return downloadAndSaveImage(externalUrl, "generated");
+            },
+          });
           images.push({ url: imageUrl, size: sizeName, dimensions: `${width}x${height}`, prompt });
         } catch (err) {
           console.error("Fal.ai generation failed:", err);

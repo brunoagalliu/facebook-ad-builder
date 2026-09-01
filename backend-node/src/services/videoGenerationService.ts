@@ -50,6 +50,7 @@ import { CharacterInput, VideoGenerationRequestInput } from "../schemas/videoGen
 import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "./blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "./blueprintSynthesisService";
 import { uploadFile } from "./storage";
+import { attachTaskId, finalizeVideoGenerationLogById, startVideoGenerationLog } from "./aiUsageService";
 
 // Covers both blueprint shapes this can be fed: a real video blueprint
 // (videoBlueprintService.ts — hook_type/pacing_and_cuts/cinematography_style/
@@ -289,7 +290,6 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
   }
 
   const brandId = (request.brand as Record<string, unknown> | undefined)?.id as string | undefined;
-  const blueprintInsight = await resolveVideoInsight(request, brandId);
 
   // Flat if/else branch per model, mirroring imageGenerationService.ts's
   // generateImages — each branch builds its own request shape independently rather
@@ -297,37 +297,52 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
   const isKling = request.model === "kling-o3";
   const model = isKling ? MODEL_KLING : MODEL_SEEDANCE;
 
-  let input: Record<string, unknown>;
-  if (isKling) {
-    input = buildKlingInput(request, blueprintInsight);
-  } else {
-    const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
-    input = {
-      prompt: buildVideoPrompt(request, blueprintInsight),
-      duration: clampDuration(totalDuration),
-      aspect_ratio: buildAspectRatio(request.aspectRatio),
-      resolution: request.resolution,
-      generate_audio: true,
-    };
-    if (request.productShots.length > 0) {
-      input.reference_image_urls = request.productShots;
+  // Started before the createTask call so a "pending" row exists even if createTask
+  // itself throws below — finalizeVideoGenerationLogById closes it out as an error in
+  // that case since no taskId ever gets assigned. Finalized later (success/fail) by
+  // GET /generate-video/:taskId in generatedAds.ts once polling observes a terminal
+  // state, since that happens well after this function has already returned.
+  const logId = await startVideoGenerationLog({ model, brandId });
+
+  try {
+    const blueprintInsight = await resolveVideoInsight(request, brandId);
+
+    let input: Record<string, unknown>;
+    if (isKling) {
+      input = buildKlingInput(request, blueprintInsight);
+    } else {
+      const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
+      input = {
+        prompt: buildVideoPrompt(request, blueprintInsight),
+        duration: clampDuration(totalDuration),
+        aspect_ratio: buildAspectRatio(request.aspectRatio),
+        resolution: request.resolution,
+        generate_audio: true,
+      };
+      if (request.productShots.length > 0) {
+        input.reference_image_urls = request.productShots;
+      }
     }
-  }
 
-  const response = await fetch(`${KIE_BASE_URL}/createTask`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${settings.KIE_AI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model, input }),
-  });
+    const response = await fetch(`${KIE_BASE_URL}/createTask`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${settings.KIE_AI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, input }),
+    });
 
-  const data = (await response.json()) as CreateTaskResponse;
-  if (!response.ok || data.code !== 200 || !data.data?.taskId) {
-    throw new Error(data.msg || `Kie.ai createTask failed with status ${response.status}`);
+    const data = (await response.json()) as CreateTaskResponse;
+    if (!response.ok || data.code !== 200 || !data.data?.taskId) {
+      throw new Error(data.msg || `Kie.ai createTask failed with status ${response.status}`);
+    }
+    await attachTaskId(logId, data.data.taskId);
+    return data.data.taskId;
+  } catch (err) {
+    await finalizeVideoGenerationLogById(logId, { status: "error", errorMessage: (err as Error).message });
+    throw err;
   }
-  return data.data.taskId;
 }
 
 export interface VideoTaskStatus {

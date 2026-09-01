@@ -1,29 +1,97 @@
-import React from 'react';
-import { ArrowUpRight, ArrowDownRight, MousePointer, Eye, BarChart2, BarChart, Download } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { BarChart, Clock, CreditCard, RefreshCw, CheckCircle2, XCircle, Loader } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-const StatCard = ({ title, value, change, trend, icon: Icon }) => (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-gray-50 rounded-lg text-gray-600">
-                <Icon size={20} />
-            </div>
-            <span className={`flex items-center text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                {change}
-                {trend === 'up' ? <ArrowUpRight size={16} className="ml-1" /> : <ArrowDownRight size={16} className="ml-1" />}
-            </span>
-        </div>
-        <h3 className="text-gray-500 text-sm font-medium">{title}</h3>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-    </div>
-);
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const PAGE_SIZE = 25;
+
+function formatDuration(ms) {
+    if (ms == null) return '—';
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.round(seconds % 60);
+    return `${minutes}m ${remaining}s`;
+}
+
+function formatCost(amount, provider) {
+    if (amount == null) return '—';
+    if (provider === 'kie') return `${amount.toFixed(1)} credits`;
+    return `$${amount.toFixed(4)}`;
+}
+
+function formatBalance(balance, unit) {
+    if (balance == null) return 'Unavailable';
+    if (unit === 'usd') return `$${balance.toFixed(2)}`;
+    return `${Math.round(balance).toLocaleString()} credits`;
+}
+
+const STATUS_BADGE = {
+    success: { icon: CheckCircle2, className: 'bg-green-50 text-green-700 border-green-200' },
+    error: { icon: XCircle, className: 'bg-red-50 text-red-700 border-red-200' },
+    pending: { icon: Loader, className: 'bg-amber-50 text-amber-700 border-amber-200' },
+};
+
+function StatusBadge({ status }) {
+    const cfg = STATUS_BADGE[status] || STATUS_BADGE.pending;
+    const Icon = cfg.icon;
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.className}`}>
+            <Icon size={12} className={status === 'pending' ? 'animate-spin' : ''} />
+            {status}
+        </span>
+    );
+}
 
 const Reporting = () => {
-    const stats = [
-        { label: "Total Impressions", value: "124.5K", change: "+12.3%", trend: "up", icon: Eye, color: "text-amber-600" },
-        { label: "Total Clicks", value: "3,842", change: "+5.4%", trend: "up", icon: MousePointer, color: "text-green-600" },
-        { label: "Avg. CTR", value: "3.1%", change: "-0.2%", trend: "down", icon: BarChart2, color: "text-red-600" },
-        { label: "Conversion Rate", value: "1.8%", change: "+0.1%", trend: "up", icon: BarChart, color: "text-purple-600" },
-    ];
+    const { authFetch } = useAuth();
+    const [balances, setBalances] = useState([]);
+    const [summary, setSummary] = useState(null);
+    const [logs, setLogs] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(0);
+    const [filters, setFilters] = useState({ media_type: '', provider: '', status: '' });
+    const [loading, setLoading] = useState(true);
+
+    const fetchAll = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) params.set(key, value);
+            });
+            params.set('skip', String(page * PAGE_SIZE));
+            params.set('limit', String(PAGE_SIZE));
+
+            const [balancesRes, summaryRes, logsRes] = await Promise.all([
+                authFetch(`${API_URL}/ai-usage/balances`),
+                authFetch(`${API_URL}/ai-usage/summary`),
+                authFetch(`${API_URL}/ai-usage/logs?${params.toString()}`),
+            ]);
+            if (balancesRes.ok) setBalances((await balancesRes.json()).balances);
+            if (summaryRes.ok) setSummary(await summaryRes.json());
+            if (logsRes.ok) {
+                const data = await logsRes.json();
+                setLogs(data.logs);
+                setTotal(data.total);
+            }
+        } catch (error) {
+            console.error('Failed to fetch AI usage data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [authFetch, filters, page]);
+
+    useEffect(() => {
+        fetchAll();
+    }, [fetchAll]);
+
+    const updateFilter = (key, value) => {
+        setPage(0);
+        setFilters((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -32,85 +100,161 @@ const Reporting = () => {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
                         <BarChart size={32} className="text-amber-600" />
-                        Campaign Reporting
+                        AI Generation Reporting
                     </h1>
-                    <p className="text-gray-600">Track performance across all your campaigns</p>
+                    <p className="text-gray-600">Cost, duration, and provider balances for image/video ad generation</p>
                 </div>
-                <div className="flex gap-2">
-                    <select className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                        <option>Last 7 Days</option>
-                        <option>Last 30 Days</option>
-                        <option>This Month</option>
-                        <option>Last Month</option>
-                    </select>
-                    <button className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
-                        <Download size={20} />
-                    </button>
-                </div>
+                <button
+                    onClick={fetchAll}
+                    className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                    title="Refresh"
+                >
+                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                </button>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
-                    <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-lg ${stat.color.replace('text-', 'bg-').replace('600', '50')}`}>
-                                <stat.icon className={stat.color} size={24} />
+            {/* Provider Balance Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {balances.map((b) => (
+                    <div key={b.provider} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="p-3 rounded-lg bg-amber-50">
+                                <CreditCard className="text-amber-600" size={24} />
                             </div>
-                            <span className={`flex items-center text-sm font-medium ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                {stat.trend === 'up' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                                {stat.change}
-                            </span>
+                            {b.error && <span className="text-xs text-red-500">{b.error}</span>}
                         </div>
-                        <h3 className="text-gray-500 text-sm font-medium">{stat.label}</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                        <h3 className="text-gray-500 text-sm font-medium">
+                            {b.provider === 'kie' ? 'Kie.ai Balance' : 'Fal.ai Balance'}
+                        </h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{formatBalance(b.balance, b.unit)}</p>
                     </div>
                 ))}
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Performance Over Time</h3>
-                    <div className="h-64 flex items-end justify-between gap-2">
-                        {[...Array(12)].map((_, i) => (
-                            <div key={i} className="w-full bg-amber-100 rounded-t-sm relative group">
-                                <div
-                                    className="absolute bottom-0 left-0 w-full bg-amber-500 rounded-t-sm transition-all duration-500 group-hover:bg-amber-600"
-                                    style={{ height: `${Math.random() * 100}%` }}
-                                ></div>
-                            </div>
-                        ))}
+            {/* Summary Stats */}
+            {summary && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h3 className="text-gray-500 text-sm font-medium">Total Generations</h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{summary.total}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h3 className="text-gray-500 text-sm font-medium">Success Rate</h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                            {summary.success_rate != null ? `${(summary.success_rate * 100).toFixed(0)}%` : '—'}
+                        </p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h3 className="text-gray-500 text-sm font-medium">Kie.ai Credits Spent</h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                            {summary.total_kie_credits_spent != null ? summary.total_kie_credits_spent.toFixed(1) : '—'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">Fal.ai cost isn't tracked per-call</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <Clock size={16} className="text-gray-400" />
+                            <h3 className="text-gray-500 text-sm font-medium">Avg Duration</h3>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{formatDuration(summary.avg_duration_ms)}</p>
                     </div>
                 </div>
+            )}
 
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Platform Distribution</h3>
-                    <div className="flex items-center justify-center h-64">
-                        <div className="relative w-48 h-48">
-                            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                                <path
-                                    className="text-gray-100"
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3.8"
-                                />
-                                <path
-                                    className="text-amber-500"
-                                    strokeDasharray="75, 100"
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3.8"
-                                />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center flex-col">
-                                <span className="text-3xl font-bold text-gray-900">75%</span>
-                                <span className="text-xs text-gray-500 uppercase font-medium">Facebook</span>
-                            </div>
-                        </div>
+            {/* Filters + Table */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="p-6 border-b border-gray-100 flex flex-wrap gap-3">
+                    <select
+                        value={filters.media_type}
+                        onChange={(e) => updateFilter('media_type', e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                        <option value="">All Media Types</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                    </select>
+                    <select
+                        value={filters.provider}
+                        onChange={(e) => updateFilter('provider', e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                        <option value="">All Providers</option>
+                        <option value="kie">Kie.ai</option>
+                        <option value="fal">Fal.ai</option>
+                    </select>
+                    <select
+                        value={filters.status}
+                        onChange={(e) => updateFilter('status', e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="success">Success</option>
+                        <option value="error">Error</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-gray-500 border-b border-gray-100">
+                                <th className="px-6 py-3 font-medium">Timestamp</th>
+                                <th className="px-6 py-3 font-medium">Type</th>
+                                <th className="px-6 py-3 font-medium">Provider</th>
+                                <th className="px-6 py-3 font-medium">Model</th>
+                                <th className="px-6 py-3 font-medium">Status</th>
+                                <th className="px-6 py-3 font-medium">Duration</th>
+                                <th className="px-6 py-3 font-medium">Cost</th>
+                                <th className="px-6 py-3 font-medium">Brand</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {logs.length === 0 && !loading && (
+                                <tr>
+                                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                                        No generations logged yet
+                                    </td>
+                                </tr>
+                            )}
+                            {logs.map((log) => (
+                                <tr key={log.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                                    <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
+                                        {new Date(log.started_at).toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-3 capitalize">{log.media_type}</td>
+                                    <td className="px-6 py-3 uppercase text-xs font-semibold text-gray-500">{log.provider}</td>
+                                    <td className="px-6 py-3 text-gray-600">{log.model}</td>
+                                    <td className="px-6 py-3">
+                                        <StatusBadge status={log.status} />
+                                    </td>
+                                    <td className="px-6 py-3 text-gray-600">{formatDuration(log.duration_ms)}</td>
+                                    <td className="px-6 py-3 text-gray-600">{formatCost(log.cost_amount, log.provider)}</td>
+                                    <td className="px-6 py-3 text-gray-600">{log.brand_name || '—'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 text-sm text-gray-600">
+                    <span>
+                        Page {page + 1} of {totalPages} ({total} total)
+                    </span>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setPage((p) => Math.max(0, p - 1))}
+                            disabled={page === 0}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                            Previous
+                        </button>
+                        <button
+                            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                            disabled={page >= totalPages - 1}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
             </div>

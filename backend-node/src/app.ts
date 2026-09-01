@@ -7,6 +7,7 @@ import { settings } from "./core/config";
 import { securityHeaders } from "./middleware/securityHeaders";
 import adRemixRouter from "./routes/adRemix";
 import adStylesRouter from "./routes/adStyles";
+import aiUsageRouter from "./routes/aiUsage";
 import authRouter from "./routes/auth";
 import brandsRouter from "./routes/brands";
 import copyGenerationRouter from "./routes/copyGeneration";
@@ -81,6 +82,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/research", researchRouter);
   app.use("/api/v1/facebook", facebookRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/ai-usage", aiUsageRouter);
 
   // All routes from backend/app/main.py are now ported.
 
