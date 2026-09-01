@@ -44,8 +44,9 @@ export async function getFalBalance(): Promise<ProviderBalance> {
     if (!response.ok) {
       return { provider: "fal", balance: null, unit: "usd", error: `status ${response.status}` };
     }
-    const data = (await response.json()) as { credits?: { balance?: number } | number };
-    const balance = typeof data.credits === "number" ? data.credits : (data.credits?.balance ?? null);
+    // Confirmed live: { username, credits: { current_balance, currency } }.
+    const data = (await response.json()) as { credits?: { current_balance?: number } };
+    const balance = data.credits?.current_balance ?? null;
     if (balance === null) {
       return { provider: "fal", balance: null, unit: "usd", error: "Unexpected response shape" };
     }
