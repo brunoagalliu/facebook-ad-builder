@@ -41,6 +41,8 @@ jobs:
 
       - name: Generate Prisma Client
         working-directory: backend-node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
         run: npx prisma generate
 
       - name: Lint
