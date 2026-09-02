@@ -64,10 +64,19 @@ export default function Settings() {
         setStyleToDelete(styleId);
     };
 
-    const confirmDeleteStyle = () => {
-        if (styleToDelete) {
+    const confirmDeleteStyle = async () => {
+        if (!styleToDelete) return;
+        try {
+            const response = await fetch(`${API_BASE}/ad-styles/${styleToDelete}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Failed to delete style' }));
+                throw new Error(errorData.detail || 'Failed to delete style');
+            }
             setStyles(styles.filter(s => s.id !== styleToDelete));
             showSuccess('Style deleted successfully');
+        } catch (error) {
+            showError(error.message || 'Failed to delete style');
+        } finally {
             setStyleToDelete(null);
         }
     };
@@ -76,20 +85,58 @@ export default function Settings() {
         setEditingStyle({ ...style });
     };
 
-    const handleSaveEdit = () => {
-        setStyles(styles.map(s => s.id === editingStyle.id ? editingStyle : s));
-        setEditingStyle(null);
-        showSuccess('Style updated successfully');
+    const handleSaveEdit = async () => {
+        try {
+            const response = await fetch(`${API_BASE}/ad-styles/${editingStyle.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editingStyle.name,
+                    category: editingStyle.category,
+                    description: editingStyle.description,
+                    best_for: editingStyle.bestFor ?? editingStyle.best_for,
+                    mood: editingStyle.mood,
+                    lighting: editingStyle.lighting,
+                    composition: editingStyle.composition,
+                    design_style: editingStyle.design_style,
+                    prompt: editingStyle.prompt,
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Failed to update style' }));
+                throw new Error(errorData.detail || 'Failed to update style');
+            }
+            const updated = await response.json();
+            setStyles(styles.map(s => s.id === updated.id ? updated : s));
+            setEditingStyle(null);
+            showSuccess('Style updated successfully');
+        } catch (error) {
+            showError(error.message || 'Failed to update style');
+        }
     };
 
-    const handleAddStyle = (newStyle) => {
+    const handleAddStyle = async (newStyle) => {
         const styleWithId = {
             ...newStyle,
             id: `custom-${Date.now()}`
         };
-        setStyles([...styles, styleWithId]);
-        setShowAddModal(false);
-        showSuccess('Style added successfully');
+        try {
+            const response = await fetch(`${API_BASE}/ad-styles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(styleWithId),
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Failed to add style' }));
+                throw new Error(errorData.detail || 'Failed to add style');
+            }
+            const created = await response.json();
+            setStyles([...styles, created]);
+            setShowAddModal(false);
+            showSuccess('Style added successfully');
+        } catch (error) {
+            showError(error.message || 'Failed to add style');
+        }
     };
 
     const handleGenerateAIStyles = async (prompt, count) => {
@@ -159,10 +206,31 @@ export default function Settings() {
                             prompts={prompts}
                             editingPrompt={editingPrompt}
                             onEdit={setEditingPrompt}
-                            onSave={() => {
-                                setPrompts(prompts.map(p => p.id === editingPrompt.id ? editingPrompt : p));
-                                setEditingPrompt(null);
-                                showSuccess('Prompt updated successfully');
+                            onSave={async () => {
+                                try {
+                                    const response = await fetch(`${API_BASE}/prompts/${editingPrompt.id}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            name: editingPrompt.name,
+                                            category: editingPrompt.category,
+                                            description: editingPrompt.description,
+                                            variables: editingPrompt.variables,
+                                            template: editingPrompt.template,
+                                            notes: editingPrompt.notes,
+                                        }),
+                                    });
+                                    if (!response.ok) {
+                                        const errorData = await response.json().catch(() => ({ detail: 'Failed to update prompt' }));
+                                        throw new Error(errorData.detail || 'Failed to update prompt');
+                                    }
+                                    const updated = await response.json();
+                                    setPrompts(prompts.map(p => p.id === updated.id ? updated : p));
+                                    setEditingPrompt(null);
+                                    showSuccess('Prompt updated successfully');
+                                } catch (error) {
+                                    showError(error.message || 'Failed to update prompt');
+                                }
                             }}
                             onCancel={() => setEditingPrompt(null)}
                             onUpdate={(updatedPrompt) => setEditingPrompt(updatedPrompt)}
