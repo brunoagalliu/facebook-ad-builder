@@ -601,7 +601,7 @@ export default function VideoAds() {
                                         <span className="font-bold text-ink">Kling O3 — Multi-Shot</span>
                                         {model === 'kling-o3' && <Check className="text-brand-600" size={18} />}
                                     </div>
-                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts. Higher cost per generation. Reference photos aren't used yet for this model.</p>
+                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts. Higher cost per generation. Needs at least 2 reference photos to use them (1 alone isn't enough).</p>
                                 </div>
                             </div>
                         </div>

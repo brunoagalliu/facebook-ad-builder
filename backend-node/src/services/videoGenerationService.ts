@@ -189,6 +189,13 @@ function clampDuration(totalSeconds: number): number {
 
 const KLING_PROMPT_MAX_CHARS = 3072;
 
+// Kling's `elements` mechanism requires each multi-image subject to have 2-4 images
+// (confirmed via Kie.ai's docs — not a guess like the previous omission was). A single
+// screenshot doesn't meet that floor, so there's nothing valid to send in that case.
+const KLING_ELEMENT_MIN_IMAGES = 2;
+const KLING_ELEMENT_MAX_IMAGES = 4;
+const KLING_PRODUCT_ELEMENT_NAME = "product";
+
 /** Kling's top-level `prompt` is a required *fallback* summary, capped at 3072 chars
  * by Kie.ai (confirmed live: reusing buildVideoPrompt's full Seedance-style output —
  * cinematography paragraph, UGC keyword list, quality-control negatives, phone-reveal
@@ -197,32 +204,61 @@ const KLING_PROMPT_MAX_CHARS = 3072;
  * lives in `multi_prompt` below, so this only needs to be a brief scene-by-scene
  * summary, not the full boilerplate-heavy prompt built for Seedance. Hard-truncated as
  * a safety net regardless, since a long character description + many scenes could
- * still theoretically exceed the cap. */
-function buildKlingFallbackPrompt(request: VideoGenerationRequestInput, blueprintInsight?: VideoBlueprintInsight): string {
+ * still theoretically exceed the cap.
+ *
+ * hasProductElement appends an @name mention (Kling's documented syntax for invoking a
+ * defined `elements` entry) so the model actually knows to draw on it — defining an
+ * element without ever referencing it by name in a prompt would leave it unused. This
+ * is deliberately added to the fallback summary rather than rewritten into individual
+ * scene actions, since mangling user-authored scene text to insert a tag is riskier
+ * than one added sentence on the summary Kling already treats as a whole-generation
+ * fallback. */
+function buildKlingFallbackPrompt(
+  request: VideoGenerationRequestInput,
+  blueprintInsight?: VideoBlueprintInsight,
+  hasProductElement?: boolean
+): string {
   if (request.customPrompt) return request.customPrompt.slice(0, KLING_PROMPT_MAX_CHARS);
 
   const location = request.location || "a cozy, well-lit home setting";
   const characterClause = buildCharacterClause(request.character);
   const hookHint = blueprintInsight?.hook_type ? ` Open with a "${blueprintInsight.hook_type}"-style hook.` : "";
   const sceneSummary = request.scenes.map((s, i) => `Shot ${i + 1}: ${s.action}`).join(" ");
+  const productHint = hasProductElement
+    ? ` Reference the @${KLING_PRODUCT_ELEMENT_NAME} asset for the product/signup page shown in this video, keeping it pixel-perfect to those reference images.`
+    : "";
 
-  const prompt = `A casual, selfie-style UGC video filmed in ${location}. ${characterClause}.${hookHint} ${sceneSummary}`.trim();
+  const prompt = `A casual, selfie-style UGC video filmed in ${location}. ${characterClause}.${hookHint} ${sceneSummary}${productHint}`.trim();
   return prompt.length > KLING_PROMPT_MAX_CHARS ? `${prompt.slice(0, KLING_PROMPT_MAX_CHARS - 3)}...` : prompt;
+}
+
+/** Builds the `elements` entry for the product/signup-page reference, or undefined if
+ * there aren't enough shots to meet Kling's own 2-4-image floor for a multi-image
+ * subject (confirmed via Kie.ai's docs: docs.kie.ai/market/kling/v3-omni-text-to-video
+ * — `elements[].element_input_urls` needs 2-4 images or exactly 1 video, referenced in
+ * prompts via `@name`). A single screenshot has no valid representation here, unlike
+ * Seedance's reference_image_urls which accepts any count starting at 1. */
+function buildProductElement(request: VideoGenerationRequestInput): Record<string, unknown> | undefined {
+  if (request.productShots.length < KLING_ELEMENT_MIN_IMAGES) return undefined;
+  const productName = (request.product as Record<string, unknown> | undefined)?.name as string | undefined;
+  return {
+    name: KLING_PRODUCT_ELEMENT_NAME,
+    description: productName ? `${productName} product photos and signup page` : "product photos and signup page",
+    element_input_urls: request.productShots.slice(0, KLING_ELEMENT_MAX_IMAGES),
+  };
 }
 
 /** Builds the input body for Kling O3's multi-shot storyboard API — each scene maps
  * 1:1 onto a real distinct shot via `multi_prompt` (unlike Seedance, where scenes are
- * flattened into one continuous-take prompt string). `elements` (image/video
- * reference assets) is deliberately omitted: Kie.ai's docs don't confirm the exact
- * per-element object shape, and guessing it risks a runtime 400 that's harder to
- * triage than just not supporting product-shot references for this model yet — the
- * wizard's Kling card copy calls this out directly. */
+ * flattened into one continuous-take prompt string). */
 export function buildKlingInput(request: VideoGenerationRequestInput, blueprintInsight?: VideoBlueprintInsight): Record<string, unknown> {
   const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
+  const productElement = buildProductElement(request);
   return {
-    prompt: buildKlingFallbackPrompt(request, blueprintInsight),
+    prompt: buildKlingFallbackPrompt(request, blueprintInsight, Boolean(productElement)),
     customize_multi_shots: true,
     multi_prompt: request.scenes.map((s) => ({ prompt: s.action, duration: s.durationSeconds })),
+    ...(productElement ? { elements: [productElement] } : {}),
     // Seedance always hardcodes audio on (below) — these are talking-head UGC ads, so
     // silent output would be a regression. Kling's own default is false.
     audio: true,
