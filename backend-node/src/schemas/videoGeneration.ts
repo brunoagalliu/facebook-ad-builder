@@ -13,6 +13,13 @@ const recordSchema = z.record(z.string(), z.unknown());
 export const videoSceneSchema = z.object({
   durationSeconds: z.number().int().min(1).max(15),
   action: z.string().min(1),
+  // One of the product's real screenshots — overlays as this scene's entire visual in
+  // the final video (audio/narration untouched), replacing whatever Kling renders for
+  // it. Kling only: each scene maps to a real, Kie.ai-honored shot duration there, so
+  // the overlay's time window is trustworthy; Seedance flattens scenes into one
+  // continuous AI-generated take with no per-beat timing guarantee, so this is ignored
+  // for that model rather than guessed at.
+  cutawayImageUrl: z.string().optional(),
 });
 export type VideoSceneInput = z.infer<typeof videoSceneSchema>;
 

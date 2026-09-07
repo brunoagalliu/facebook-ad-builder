@@ -673,6 +673,23 @@ export default function VideoAds() {
                                             rows={2}
                                             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
                                         />
+                                        {model === 'kling-o3' && wizardData.product?.product_shots?.length > 0 && (
+                                            <div className="mt-2">
+                                                <select
+                                                    value={scene.cutawayImageUrl || ''}
+                                                    onChange={(e) => updateScene(i, 'cutawayImageUrl', e.target.value || undefined)}
+                                                    className="text-sm border border-border rounded px-2 py-1 w-full"
+                                                >
+                                                    <option value="">No cutaway — let Kling render this shot</option>
+                                                    {wizardData.product.product_shots.map((url, shotIdx) => (
+                                                        <option key={url} value={url}>Cutaway to screenshot {shotIdx + 1}</option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-ink-tertiary mt-1">
+                                                    Replaces this shot's entire visual with a real screenshot instead of relying on AI-rendered text — audio/narration keeps playing underneath. Kling only; scene timing isn't reliable enough for this on Seedance.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

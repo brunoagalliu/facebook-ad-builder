@@ -300,6 +300,11 @@ model AiGenerationLog {
   costAmount    Float?    @map("cost_amount") // balanceBefore - balanceAfter; null if unmeasurable
   durationMs    Int?      @map("duration_ms")
   errorMessage  String?   @map("error_message")
+  // Free-form plan data that needs to survive the gap between task creation and the
+  // later poll-completion call (e.g. video generation's cutaway overlay windows) —
+  // this row is already keyed by taskId across that exact async lifecycle, so it's the
+  // natural place to stash it rather than adding a new table.
+  metadata      Json?
   startedAt     DateTime  @default(now()) @map("started_at")
   completedAt   DateTime? @map("completed_at")
 

@@ -42,7 +42,12 @@
  * persist the video immediately — mirrors downloadAndSaveImage's same constraint for
  * Fal.ai's image URLs in imageGenerationService.ts.
  */
+import { execFile } from "child_process";
 import { randomUUID } from "crypto";
+import fs from "fs/promises";
+import os from "os";
+import path from "path";
+import { promisify } from "util";
 import sharp from "sharp";
 
 import { settings } from "../core/config";
@@ -67,6 +72,8 @@ interface VideoBlueprintInsight {
   cinematography_style?: string;
   authenticity_signals?: string[];
 }
+
+const execFileAsync = promisify(execFile);
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
 const MODEL_SEEDANCE = "bytedance/seedance-2";
@@ -326,6 +333,29 @@ export async function buildKlingInput(
   };
 }
 
+export interface CutawayWindow {
+  start: number;
+  end: number;
+  imageUrl: string;
+}
+
+/** Cumulative-sums scene durations to derive each scene's [start, end) window, then
+ * keeps only the ones with a cutawayImageUrl set. Kling-only (see videoSceneSchema's
+ * cutawayImageUrl comment) — callers are responsible for not calling this for
+ * Seedance, where these timestamps wouldn't correspond to anything real. */
+function buildCutawayPlan(request: VideoGenerationRequestInput): CutawayWindow[] {
+  let cursor = 0;
+  const windows: CutawayWindow[] = [];
+  for (const scene of request.scenes) {
+    const start = cursor;
+    cursor += scene.durationSeconds;
+    if (scene.cutawayImageUrl) {
+      windows.push({ start, end: cursor, imageUrl: scene.cutawayImageUrl });
+    }
+  }
+  return windows;
+}
+
 /** Prefers a real video-native blueprint (stage 4) for the brand's vertical; falls
  * back to the text-level insight extractable from an image blueprint (stage 3) when
  * no video blueprint has been promoted for that vertical yet. */
@@ -389,12 +419,22 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
   const isKling = request.model === "kling-o3";
   const model = isKling ? MODEL_KLING : MODEL_SEEDANCE;
 
+  // Cutaway plan is computed here (while we still have the real scene list) and
+  // stashed on the log row keyed by taskId, since the poll route that eventually
+  // downloads the video only ever sees a bare taskId — see aiUsageService.ts's
+  // getLogMetadataByTaskId.
+  const cutaways = isKling ? buildCutawayPlan(request) : [];
+
   // Started before the createTask call so a "pending" row exists even if createTask
   // itself throws below — finalizeVideoGenerationLogById closes it out as an error in
   // that case since no taskId ever gets assigned. Finalized later (success/fail) by
   // GET /generate-video/:taskId in generatedAds.ts once polling observes a terminal
   // state, since that happens well after this function has already returned.
-  const logId = await startVideoGenerationLog({ model, brandId });
+  const logId = await startVideoGenerationLog({
+    model,
+    brandId,
+    metadata: cutaways.length ? { cutaways } : undefined,
+  });
 
   try {
     const blueprintInsight = await resolveVideoInsight(request, brandId);
@@ -472,12 +512,100 @@ export async function getVideoTaskStatus(taskId: string): Promise<VideoTaskStatu
   return { state, progress, failMsg };
 }
 
+/** Overlays each cutaway's image over the source video for its [start, end) window,
+ * replacing only the picture — the original audio track is copied through untouched
+ * (`-map 0:a? -c:a copy`), so narration keeps playing under the cut exactly like a
+ * real "talking head -> screen-recording B-roll -> back" edit. Chains one `overlay`
+ * filter per cutaway rather than trying to do it in one filtergraph node, since each
+ * window is independent and this reads far more straightforwardly for 1-3 cutaways.
+ * Returns the original buffer unchanged on any failure (missing ffmpeg, a bad image
+ * URL, a malformed window) — a cutaway is a nice-to-have polish step, and losing an
+ * otherwise-successful generation over it would be a much worse outcome than just
+ * skipping the overlay. */
+async function applyCutaways(videoBuffer: Buffer, cutaways: CutawayWindow[]): Promise<Buffer> {
+  if (cutaways.length === 0) return videoBuffer;
+
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "cutaway-"));
+  try {
+    const inputPath = path.join(workDir, "input.mp4");
+    await fs.writeFile(inputPath, videoBuffer);
+
+    const imagePaths: string[] = [];
+    for (const [i, cutaway] of cutaways.entries()) {
+      const imageResponse = await fetch(cutaway.imageUrl, { signal: AbortSignal.timeout(30_000) });
+      if (!imageResponse.ok) throw new Error(`Failed to download cutaway image: ${imageResponse.status}`);
+      const imagePath = path.join(workDir, `cutaway-${i}.jpg`);
+      await fs.writeFile(imagePath, Buffer.from(await imageResponse.arrayBuffer()));
+      imagePaths.push(imagePath);
+    }
+
+    // scale2ref's ref_w/ref_h cross-reference expression doesn't parse on the ffmpeg
+    // build actually deployed (confirmed live: "Undefined constant or missing '(' in
+    // 'ref_w'") despite being documented — probing the real dimensions with ffprobe
+    // first and using a plain literal `scale=W:H` sidesteps that filter entirely
+    // rather than fighting a version-specific expression-parsing quirk.
+    const { stdout: dimensionsOut } = await execFileAsync("ffprobe", [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=s=x:p=0",
+      inputPath,
+    ]);
+    const [videoWidth, videoHeight] = dimensionsOut.trim().split("x").map(Number);
+    if (!videoWidth || !videoHeight) throw new Error(`Could not determine video dimensions from ffprobe output: "${dimensionsOut}"`);
+
+    const outputPath = path.join(workDir, "output.mp4");
+    const inputArgs = imagePaths.flatMap((p) => ["-i", p]);
+
+    const scaleSteps = cutaways.map((_, i) => `[${i + 1}:v]scale=${videoWidth}:${videoHeight}[img${i}]`);
+    // Overlays chain sequentially — each step's output feeds the next step's base,
+    // gated to only that cutaway's own time window so only one image shows at a time.
+    const overlaySteps = cutaways.map((cutaway, i) => {
+      const src = i === 0 ? "0:v" : `v${i}`;
+      const outLabel = i === cutaways.length - 1 ? "vout" : `v${i + 1}`;
+      return `[${src}][img${i}]overlay=enable='between(t,${cutaway.start},${cutaway.end})'[${outLabel}]`;
+    });
+
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i",
+      inputPath,
+      ...inputArgs,
+      "-filter_complex",
+      [...scaleSteps, ...overlaySteps].join(";"),
+      "-map",
+      "[vout]",
+      "-map",
+      "0:a?",
+      "-c:a",
+      "copy",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      outputPath,
+    ]);
+
+    return await fs.readFile(outputPath);
+  } catch (err) {
+    console.error("Failed to apply video cutaways, using original video instead:", err);
+    return videoBuffer;
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 /** Kie.ai's result URLs expire 24h after task completion — download immediately
  * rather than storing the ephemeral URL, mirroring downloadAndSaveImage. */
-export async function downloadAndSaveVideo(videoUrl: string): Promise<string> {
+export async function downloadAndSaveVideo(videoUrl: string, cutaways: CutawayWindow[] = []): Promise<string> {
   const response = await fetch(videoUrl, { signal: AbortSignal.timeout(120_000) });
   if (!response.ok) throw new Error(`Failed to download video: ${response.status}`);
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const rawBuffer = Buffer.from(await response.arrayBuffer());
+  const buffer = await applyCutaways(rawBuffer, cutaways);
   const filename = `generated_${randomUUID()}.mp4`;
   return uploadFile(buffer, filename, "video/mp4");
 }

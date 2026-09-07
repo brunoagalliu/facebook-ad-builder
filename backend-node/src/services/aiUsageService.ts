@@ -2,6 +2,8 @@
 // fallback), plus live balance lookups for the same two providers. A balance check
 // failing must never break the actual generation — every function here swallows its
 // own errors and returns a null/partial result instead of throwing.
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "../core/prisma";
 import { settings } from "../core/config";
 
@@ -127,7 +129,7 @@ export async function logImageGeneration<T>(params: {
 // Async path: Kie.ai video generation returns a taskId quickly and completes later,
 // detected by the frontend polling GET /generate-video/:taskId. Rows sit at
 // status="pending" between startVideoGenerationLog and the eventual finalize call.
-export async function startVideoGenerationLog(params: { model: string; brandId?: string }): Promise<string> {
+export async function startVideoGenerationLog(params: { model: string; brandId?: string; metadata?: Record<string, unknown> }): Promise<string> {
   const balanceBefore = await getBalance("kie");
   const log = await prisma.aiGenerationLog.create({
     data: {
@@ -137,6 +139,7 @@ export async function startVideoGenerationLog(params: { model: string; brandId?:
       status: "pending",
       brandId: params.brandId,
       balanceBefore,
+      metadata: params.metadata as Prisma.InputJsonValue | undefined,
     },
   });
   return log.id;
@@ -144,6 +147,19 @@ export async function startVideoGenerationLog(params: { model: string; brandId?:
 
 export async function attachTaskId(logId: string, taskId: string): Promise<void> {
   await prisma.aiGenerationLog.update({ where: { id: logId }, data: { taskId } }).catch((err) => console.error("Failed to attach taskId to AiGenerationLog:", err));
+}
+
+// Read-only lookup for data stashed at task-creation time (e.g. cutaway overlay plans)
+// that the poll route needs before it finalizes the row — best-effort, never throws,
+// since a lookup failure should degrade to "no plan" rather than break the download.
+export async function getLogMetadataByTaskId(taskId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const log = await prisma.aiGenerationLog.findFirst({ where: { taskId } });
+    return (log?.metadata as Record<string, unknown> | null) ?? null;
+  } catch (err) {
+    console.error("Failed to read AiGenerationLog metadata:", err);
+    return null;
+  }
 }
 
 // Guarded by status="pending" in the WHERE clause — a re-poll after completion (or a

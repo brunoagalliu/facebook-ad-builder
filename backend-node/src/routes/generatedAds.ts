@@ -12,8 +12,8 @@ import { VideoBlueprint } from "../schemas/videoBlueprint";
 import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "../services/blueprintSynthesisService";
 import { generateImages } from "../services/imageGenerationService";
-import { createVideoTask, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
-import { finalizeVideoGenerationLog } from "../services/aiUsageService";
+import { createVideoTask, CutawayWindow, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
+import { finalizeVideoGenerationLog, getLogMetadataByTaskId } from "../services/aiUsageService";
 import { serialize as serializeWinningAd } from "./templates";
 
 const router = Router();
@@ -155,7 +155,12 @@ router.get(
     try {
       const status = await getVideoTaskStatus(req.params.taskId);
       if (status.state === "success" && status.resultUrl) {
-        const videoUrl = await downloadAndSaveVideo(status.resultUrl);
+        // Cutaway plan was stashed on the log row at task-creation time (see
+        // createVideoTask) since this route only ever sees a bare taskId, not the
+        // original request's scenes.
+        const metadata = await getLogMetadataByTaskId(req.params.taskId);
+        const cutaways = (metadata?.cutaways as CutawayWindow[] | undefined) ?? [];
+        const videoUrl = await downloadAndSaveVideo(status.resultUrl, cutaways);
         await finalizeVideoGenerationLog(req.params.taskId, { status: "success" });
         res.json({ state: status.state, video_url: videoUrl });
         return;
