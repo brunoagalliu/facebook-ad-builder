@@ -43,6 +43,7 @@
  * Fal.ai's image URLs in imageGenerationService.ts.
  */
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 
 import { settings } from "../core/config";
 import { prisma } from "../core/prisma";
@@ -195,6 +196,12 @@ const KLING_PROMPT_MAX_CHARS = 3072;
 const KLING_ELEMENT_MIN_IMAGES = 2;
 const KLING_ELEMENT_MAX_IMAGES = 4;
 const KLING_PRODUCT_ELEMENT_NAME = "product";
+// Confirmed live: Kie.ai rejects any element image outside this width/height range
+// ("aspect ratio must be between 0.4 and 2.5") — landing-page screenshots
+// (screenshotService.ts) are deliberately full-page/tall for human review (a real one
+// came back 390x2863, ratio ~0.14), so they routinely violate this.
+const KLING_ELEMENT_MIN_ASPECT = 0.4;
+const KLING_ELEMENT_MAX_ASPECT = 2.5;
 
 /** Kling's top-level `prompt` is a required *fallback* summary, capped at 3072 chars
  * by Kie.ai (confirmed live: reusing buildVideoPrompt's full Seedance-style output —
@@ -232,28 +239,77 @@ function buildKlingFallbackPrompt(
   return prompt.length > KLING_PROMPT_MAX_CHARS ? `${prompt.slice(0, KLING_PROMPT_MAX_CHARS - 3)}...` : prompt;
 }
 
+/** Crops an image down to Kling's valid 0.4-2.5 aspect ratio if it's outside that
+ * range, re-uploading the crop and returning its new URL; returns the original URL
+ * unchanged if already valid (the common case for manually-uploaded product photos —
+ * this only re-processes what actually needs it). Top-crops (keeps width, trims
+ * height) rather than center- or bottom-cropping, since a landing page's hero/header
+ * — the top of the page — is the most recognizable, useful crop for a reference image,
+ * not an arbitrary lower slice. Returns null if the image can't be fetched/decoded at
+ * all, so the caller can drop it rather than fail the whole generation over one bad
+ * URL. */
+async function prepareKlingReferenceImage(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const metadata = await sharp(buffer).metadata();
+    if (!metadata.width || !metadata.height) return null;
+
+    const aspect = metadata.width / metadata.height;
+    if (aspect >= KLING_ELEMENT_MIN_ASPECT && aspect <= KLING_ELEMENT_MAX_ASPECT) {
+      return url;
+    }
+
+    const targetWidth = aspect > KLING_ELEMENT_MAX_ASPECT ? Math.round(metadata.height * KLING_ELEMENT_MAX_ASPECT) : metadata.width;
+    const targetHeight = aspect < KLING_ELEMENT_MIN_ASPECT ? Math.round(metadata.width / KLING_ELEMENT_MIN_ASPECT) : metadata.height;
+
+    const cropped = await sharp(buffer)
+      .extract({
+        left: 0,
+        top: 0,
+        width: Math.min(targetWidth, metadata.width),
+        height: Math.min(targetHeight, metadata.height),
+      })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    return await uploadFile(cropped, `${randomUUID()}-kling-ref.jpg`, "image/jpeg");
+  } catch (err) {
+    console.error("Failed to prepare Kling reference image:", url, err);
+    return null;
+  }
+}
+
 /** Builds the `elements` entry for the product/signup-page reference, or undefined if
- * there aren't enough shots to meet Kling's own 2-4-image floor for a multi-image
- * subject (confirmed via Kie.ai's docs: docs.kie.ai/market/kling/v3-omni-text-to-video
- * — `elements[].element_input_urls` needs 2-4 images or exactly 1 video, referenced in
- * prompts via `@name`). A single screenshot has no valid representation here, unlike
- * Seedance's reference_image_urls which accepts any count starting at 1. */
-function buildProductElement(request: VideoGenerationRequestInput): Record<string, unknown> | undefined {
-  if (request.productShots.length < KLING_ELEMENT_MIN_IMAGES) return undefined;
+ * there aren't enough valid shots to meet Kling's own 2-4-image floor for a
+ * multi-image subject (confirmed via Kie.ai's docs:
+ * docs.kie.ai/market/kling/v3-omni-text-to-video — `elements[].element_input_urls`
+ * needs 2-4 images or exactly 1 video, referenced in prompts via `@name`). A single
+ * screenshot has no valid representation here, unlike Seedance's
+ * reference_image_urls which accepts any count starting at 1. */
+async function buildProductElement(request: VideoGenerationRequestInput): Promise<Record<string, unknown> | undefined> {
+  const prepared = await Promise.all(request.productShots.map(prepareKlingReferenceImage));
+  const valid = prepared.filter((url): url is string => url !== null);
+  if (valid.length < KLING_ELEMENT_MIN_IMAGES) return undefined;
+
   const productName = (request.product as Record<string, unknown> | undefined)?.name as string | undefined;
   return {
     name: KLING_PRODUCT_ELEMENT_NAME,
     description: productName ? `${productName} product photos and signup page` : "product photos and signup page",
-    element_input_urls: request.productShots.slice(0, KLING_ELEMENT_MAX_IMAGES),
+    element_input_urls: valid.slice(0, KLING_ELEMENT_MAX_IMAGES),
   };
 }
 
 /** Builds the input body for Kling O3's multi-shot storyboard API — each scene maps
  * 1:1 onto a real distinct shot via `multi_prompt` (unlike Seedance, where scenes are
  * flattened into one continuous-take prompt string). */
-export function buildKlingInput(request: VideoGenerationRequestInput, blueprintInsight?: VideoBlueprintInsight): Record<string, unknown> {
+export async function buildKlingInput(
+  request: VideoGenerationRequestInput,
+  blueprintInsight?: VideoBlueprintInsight
+): Promise<Record<string, unknown>> {
   const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
-  const productElement = buildProductElement(request);
+  const productElement = await buildProductElement(request);
   return {
     prompt: buildKlingFallbackPrompt(request, blueprintInsight, Boolean(productElement)),
     customize_multi_shots: true,
@@ -345,7 +401,7 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
 
     let input: Record<string, unknown>;
     if (isKling) {
-      input = buildKlingInput(request, blueprintInsight);
+      input = await buildKlingInput(request, blueprintInsight);
     } else {
       const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
       input = {
