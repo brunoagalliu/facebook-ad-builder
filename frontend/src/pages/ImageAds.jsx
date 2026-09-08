@@ -8,6 +8,7 @@ import BrandSelectionStep from '../components/steps/BrandSelectionStep';
 import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
+import { downloadFile } from '../lib/download';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -1793,16 +1794,14 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                     </div>
 
                                     {/* Download Button */}
-                                    <a
-                                        href={viewedImage.url}
-                                        download={`ad-${viewedImage.size}-${Date.now()}.png`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadFile(viewedImage.url, `ad-${viewedImage.size}-${Date.now()}.png`).catch(() => showError('Failed to download image. Please try again.'))}
                                         className="w-full py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-bold flex items-center justify-center gap-2 transition-colors"
                                     >
                                         <Download size={20} />
                                         Download Image
-                                    </a>
+                                    </button>
                                 </div>
                             </div>
                         </div>

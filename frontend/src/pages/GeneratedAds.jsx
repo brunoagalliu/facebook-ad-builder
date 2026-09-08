@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Download, Trash2, Search, Filter, CheckSquare, Square, FileDown, ExternalLink, FileText, Image, LayoutGrid, List, Film } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
+import { downloadFile } from '../lib/download';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -719,16 +720,18 @@ export default function GeneratedAds() {
                                         </div>
 
                                         {/* Download Button */}
-                                        <a
-                                            href={viewedImage.media_type === 'video' ? viewedImage.video_url : viewedImage.image_url}
-                                            download={`ad-${viewedImage.size_name || 'media'}-${Date.now()}.${viewedImage.media_type === 'video' ? 'mp4' : 'png'}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const url = viewedImage.media_type === 'video' ? viewedImage.video_url : viewedImage.image_url;
+                                                const filename = `ad-${viewedImage.size_name || 'media'}-${Date.now()}.${viewedImage.media_type === 'video' ? 'mp4' : 'png'}`;
+                                                downloadFile(url, filename).catch(() => showError('Failed to download file. Please try again.'));
+                                            }}
                                             className="w-full py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-bold flex items-center justify-center gap-2 transition-colors"
                                         >
                                             <Download size={20} />
                                             Download {viewedImage.media_type === 'video' ? 'Video' : 'Image'}
-                                        </a>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

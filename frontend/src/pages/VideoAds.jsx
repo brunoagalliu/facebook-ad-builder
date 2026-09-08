@@ -7,6 +7,7 @@ import BrandSelectionStep from '../components/steps/BrandSelectionStep';
 import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import ImageTemplateSelector from '../components/ImageTemplateSelector';
+import { downloadFile } from '../lib/download';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -811,13 +812,13 @@ export default function VideoAds() {
                                     className="max-w-sm mx-auto rounded-lg shadow-md mb-6"
                                 />
                                 <div className="flex items-center justify-center gap-3">
-                                    <a
-                                        href={generatedVideoUrl}
-                                        download
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadFile(generatedVideoUrl, `generated-video-${Date.now()}.mp4`).catch(() => showError('Failed to download video. Please try again.'))}
                                         className="flex items-center gap-2 px-4 py-2 bg-surface-hover text-ink-secondary rounded-lg hover:bg-border font-medium"
                                     >
                                         <Download size={18} /> Download
-                                    </a>
+                                    </button>
                                     <button
                                         onClick={() => {
                                             setGeneratedVideoUrl(null);
