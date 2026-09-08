@@ -7,7 +7,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
-import { Part2Input, videoGenerationRequestSchema } from "../schemas/videoGeneration";
+import { Part2Input, videoEditRequestSchema, videoGenerationRequestSchema } from "../schemas/videoGeneration";
 import { AdBlueprint } from "../schemas/adBlueprint";
 import { VideoBlueprint } from "../schemas/videoBlueprint";
 import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
@@ -18,6 +18,7 @@ import {
   concatenateVideos,
   createSegment2Task,
   CutawayWindow,
+  createVideoEditTask,
   createVideoTask,
   downloadAndSaveVideo,
   downloadVideoBuffer,
@@ -156,6 +157,24 @@ router.post(
       res.json({ task_id: logId });
     } catch (err) {
       res.status(502).json({ detail: (err as Error).message || "Video generation failed to start" });
+    }
+  })
+);
+
+// Targeted edit on an already-generated video ("change her sweater to blue") rather
+// than a full reroll — returns the same shape as /generate-video and is polled via
+// the exact same GET /generate-video/:id below, since createVideoEditTask's log row
+// carries no `stage` metadata and falls through to that route's plain success path.
+router.post(
+  "/generate-video-edit",
+  requirePermission("ads:write"),
+  validateBody(videoEditRequestSchema),
+  asyncHandler(async (req, res) => {
+    try {
+      const logId = await createVideoEditTask(req.body);
+      res.json({ task_id: logId });
+    } catch (err) {
+      res.status(502).json({ detail: (err as Error).message || "Video edit failed to start" });
     }
   })
 );

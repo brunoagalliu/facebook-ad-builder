@@ -92,3 +92,19 @@ export const videoGenerationRequestSchema = z
     }
   });
 export type VideoGenerationRequestInput = z.infer<typeof videoGenerationRequestSchema>;
+
+// Targeted "fix just this" edit on an already-generated video, rather than a full
+// reroll — Seedance 2.5 only (confirmed live: feeding an existing video back in via
+// reference_video_urls plus an edit-phrased prompt, e.g. "change her sweater to
+// blue", makes Kie.ai auto-detect it as a video-editing task and modify only the
+// flagged region/element while leaving everything else in the source untouched — no
+// separate model or explicit "edit mode" flag needed). Kie.ai requires the source
+// video to be 4-30s; shorter clips 400 with a clear error rather than silently
+// falling back to a fresh generation.
+export const videoEditRequestSchema = z.object({
+  sourceVideoUrl: z.string().min(1),
+  instruction: z.string().min(1).max(2500),
+  resolution: z.enum(["480p", "720p", "1080p"]).optional().default("720p"),
+  brandId: z.string().optional(),
+});
+export type VideoEditRequestInput = z.infer<typeof videoEditRequestSchema>;

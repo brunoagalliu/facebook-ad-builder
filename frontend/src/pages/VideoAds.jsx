@@ -94,6 +94,17 @@ export default function VideoAds() {
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState(null);
     const pollAbortRef = useRef(false);
 
+    // Targeted "fix just this" edit on the video already sitting in generatedVideoUrl
+    // — Seedance 2.5's reference_video_urls + duration:-1 confirmed live to modify
+    // only the described element/region while leaving the rest of the take untouched,
+    // regardless of which model originally generated it (editing is a property of the
+    // edit call, not the source clip). isEditingVideo only distinguishes the loading
+    // label from a fresh generation; `generating` itself is reused so the same
+    // full-screen progress UI applies to both.
+    const [showEditPanel, setShowEditPanel] = useState(false);
+    const [editInstruction, setEditInstruction] = useState('');
+    const [isEditingVideo, setIsEditingVideo] = useState(false);
+
     // Which winning-ad blueprint steers generation: 'auto' (default — createVideoTask
     // already auto-selects one for the brand's vertical server-side, same rotating-pool
     // logic ImageAds.jsx's auto-suggested template uses), 'single' (one specific
@@ -268,6 +279,7 @@ export default function VideoAds() {
 
     const handleGenerate = async () => {
         setGenerating(true);
+        setIsEditingVideo(false);
         setGeneratedVideoUrl(null);
         setGenerationState('waiting');
         pollAbortRef.current = false;
@@ -363,12 +375,75 @@ export default function VideoAds() {
         }
     };
 
+    const handleEditVideo = async () => {
+        if (!editInstruction.trim()) return;
+        setGenerating(true);
+        setIsEditingVideo(true);
+        setGenerationState('waiting');
+        pollAbortRef.current = false;
+
+        try {
+            const response = await authFetch(`${API_URL}/generated-ads/generate-video-edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sourceVideoUrl: generatedVideoUrl,
+                    instruction: editInstruction.trim(),
+                    brandId: wizardData.brand?.id,
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to start video edit');
+            }
+
+            const videoUrl = await pollVideoStatus(data.task_id);
+            setGeneratedVideoUrl(videoUrl);
+            setShowEditPanel(false);
+            setEditInstruction('');
+            showSuccess('Edit applied successfully!');
+
+            // Save the edited result as its own entry, same pattern as handleGenerate.
+            try {
+                const saveResponse = await authFetch(`${API_URL}/generated-ads/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ads: [{
+                            id: `ga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            brandId: wizardData.brand?.id,
+                            productId: wizardData.product?.id,
+                            mediaType: 'video',
+                            videoUrl,
+                            headline: selectedVideoTemplate?.headline || undefined,
+                            body: selectedVideoTemplate?.body_text || undefined,
+                            cta: selectedVideoTemplate?.cta_text || undefined,
+                        }]
+                    })
+                });
+                if (!saveResponse.ok) {
+                    throw new Error(`Batch save failed: ${saveResponse.statusText}`);
+                }
+            } catch (saveError) {
+                console.error('Failed to save edited video to database:', saveError);
+                showError('Edit applied but failed to save to Generated Ads. Download it below before leaving this page.');
+            }
+        } catch (error) {
+            console.error('Video edit error:', error);
+            showError(error.message || 'Failed to edit video. Please try again.');
+            setGenerationState('fail');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
     const stateLabel = {
         waiting: 'Queued…',
         queuing: 'Queued…',
-        generating: 'Generating your video (this can take a few minutes)…',
+        generating: isEditingVideo ? 'Applying your edit (this can take a minute)…' : 'Generating your video (this can take a few minutes)…',
         success: 'Done!',
-        fail: 'Generation failed',
+        fail: isEditingVideo ? 'Edit failed' : 'Generation failed',
     };
 
     return (
@@ -834,6 +909,13 @@ export default function VideoAds() {
                                         <Wand2 size={18} /> Refine & Regenerate
                                     </button>
                                     <button
+                                        type="button"
+                                        onClick={() => setShowEditPanel((prev) => !prev)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-surface-hover text-ink-secondary rounded-lg hover:bg-border font-medium"
+                                    >
+                                        <Wand2 size={18} /> Edit This Video
+                                    </button>
+                                    <button
                                         onClick={() => {
                                             setGeneratedVideoUrl(null);
                                             setGenerationState(null);
@@ -843,6 +925,39 @@ export default function VideoAds() {
                                         <Sparkles size={18} /> Generate Another (same settings)
                                     </button>
                                 </div>
+
+                                {showEditPanel && (
+                                    <div className="mt-4 max-w-md mx-auto text-left bg-surface-hover border border-border rounded-lg p-4">
+                                        <label className="block text-sm font-bold text-ink mb-1">What should change?</label>
+                                        <p className="text-xs text-ink-tertiary mb-2">
+                                            Edits just the thing you describe — everything else in this exact take (face, setting, framing) stays the same. Works regardless of which model made this video, but source clips under 4s can't be edited.
+                                        </p>
+                                        <textarea
+                                            value={editInstruction}
+                                            onChange={(e) => setEditInstruction(e.target.value)}
+                                            placeholder='e.g. "Change her sweater to blue" or "Remove the papers from her hands"'
+                                            rows={2}
+                                            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm mb-3"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleEditVideo}
+                                                disabled={!editInstruction.trim()}
+                                                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Apply Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowEditPanel(false); setEditInstruction(''); }}
+                                                className="px-4 py-2 bg-surface text-ink-secondary rounded-lg hover:bg-border font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

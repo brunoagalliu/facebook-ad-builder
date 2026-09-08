@@ -68,7 +68,7 @@ import sharp from "sharp";
 
 import { settings } from "../core/config";
 import { prisma } from "../core/prisma";
-import { CharacterInput, Part2Input, VideoGenerationRequestInput } from "../schemas/videoGeneration";
+import { CharacterInput, Part2Input, VideoEditRequestInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
 import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "./blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "./blueprintSynthesisService";
 import { uploadFile } from "./storage";
@@ -578,6 +578,50 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
     const data = (await response.json()) as CreateTaskResponse;
     if (!response.ok || data.code !== 200 || !data.data?.taskId) {
       throw new Error(data.msg || `Kie.ai createTask failed with status ${response.status}`);
+    }
+    await attachTaskId(logId, data.data.taskId);
+    return logId;
+  } catch (err) {
+    await finalizeVideoGenerationLogById(logId, { status: "error", errorMessage: (err as Error).message });
+    throw err;
+  }
+}
+
+/** Targeted edit on an already-generated video, reusing the exact same job/poll
+ * pipeline as createVideoTask (same log-row lifecycle, same GET /generate-video/:id
+ * route downstream — that route already falls through to the plain single-segment
+ * path for any log with no `stage` metadata, which this doesn't set). `duration: -1`
+ * and `reference_video_urls` are what make Kie.ai treat this as an edit rather than a
+ * fresh generation — see videoEditRequestSchema's doc comment for how that was
+ * confirmed. Seedance 2.5 only; no equivalent exists on Seedance 2.0 or Kling. */
+export async function createVideoEditTask(request: VideoEditRequestInput): Promise<string> {
+  if (!settings.KIE_AI_API_KEY) {
+    throw new Error("KIE_AI_API_KEY not configured");
+  }
+
+  const logId = await startVideoGenerationLog({ model: MODEL_SEEDANCE_25, brandId: request.brandId });
+
+  try {
+    const input = {
+      prompt: request.instruction,
+      reference_video_urls: [request.sourceVideoUrl],
+      duration: -1,
+      resolution: request.resolution,
+      generate_audio: true,
+    };
+
+    const response = await fetch(`${KIE_BASE_URL}/createTask`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${settings.KIE_AI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: MODEL_SEEDANCE_25, input }),
+    });
+
+    const data = (await response.json()) as CreateTaskResponse;
+    if (!response.ok || data.code !== 200 || !data.data?.taskId) {
+      throw new Error(data.msg || `Kie.ai createTask (edit) failed with status ${response.status}`);
     }
     await attachTaskId(logId, data.data.taskId);
     return logId;
