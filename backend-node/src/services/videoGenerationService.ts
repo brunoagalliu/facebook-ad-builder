@@ -1,18 +1,31 @@
 /**
- * AI UGC video generation via Kie.ai, supporting two models the user picks between in
- * the wizard (`request.model`):
- *   - "seedance" (default) — Bytedance Seedance 2.0, one continuous single-shot take
- *     per call, no storyboard API. The prompt structure (iPhone-selfie framing,
- *     cinematography boilerplate, UGC authenticity keywords, quality-control negative
- *     list, and the "reference a proven winner, then iterate" character/product
- *     fidelity approach) is distilled from a course on AI UGC ad production — see
+ * AI UGC video generation via Kie.ai, supporting three models the user picks between
+ * in the wizard (`request.model`):
+ *   - "seedance-2-5" (default) — Bytedance Seedance 2.5, ByteDance's newer flagship.
+ *     Ranked #1 on the Artificial Analysis text-to-video/image-to-video leaderboards
+ *     as of mid-2026 and specifically strong on product-ad/UGC character consistency
+ *     — confirmed to outperform Kling O3 on quality in this app's own live testing.
+ *     One continuous take per call like Seedance 2.0 below (no multi-shot storyboard
+ *     API), but natively generates up to 30s in a single pass — twice Seedance 2.0's
+ *     and Kling's 15s ceiling — with richer reference support (up to 30
+ *     reference_image_urls vs Kling's 2-4-per-element `elements` mechanism).
+ *   - "seedance" — Bytedance Seedance 2.0, the original integration, kept as a
+ *     cheaper/legacy option. One continuous single-shot take per call, no storyboard
+ *     API. The prompt structure (iPhone-selfie framing, cinematography boilerplate,
+ *     UGC authenticity keywords, quality-control negative list, and the "reference a
+ *     proven winner, then iterate" character/product fidelity approach) is distilled
+ *     from a course on AI UGC ad production — see
  *     knowledge/direct_response/21_hook_iteration_from_reference.md for the text-copy
  *     analogue of the same "iterate on proven references" principle.
  *   - "kling-o3" — Kling 3.0 Omni (kling-3.0-omni/text-to-video), a genuinely
  *     different model that supports real multi-shot storyboarding: up to 6 distinct
  *     shots, each with its own prompt/duration, cut together in one generation
  *     (buildKlingInput below). Confirmed via Kie.ai's own API docs
- *     (docs.kie.ai/market/kling/v3-omni-text-to-video) rather than guessed.
+ *     (docs.kie.ai/market/kling/v3-omni-text-to-video) rather than guessed. Still the
+ *     only option with real per-shot cuts and the long-video (`part2`) continuation
+ *     mode — Seedance 2.5's native 30s ceiling covers the same "longer than 15s" need
+ *     for anything that fits in one continuous take, without needing that chaining
+ *     machinery at all.
  *
  * Originally built against Kie.ai's Sora-2-pro-storyboard model, which turned out to
  * be paused platform-wide (Kie.ai returned "This interface is temporarily paused" on
@@ -23,13 +36,16 @@
  * mechanism than Sora's free-text-description-or-character-tag approach — upload a
  * real photo/voice sample and it's used directly, rather than described in prose.
  *
- * Both models share the exact same Kie.ai job API — only the `model` string and
+ * All three models share the exact same Kie.ai job API — only the `model` string and
  * `input` shape submitted to createTask differ; polling and result-download are
  * completely model-agnostic:
  *   POST https://api.kie.ai/api/v1/jobs/createTask
  *     Authorization: Bearer <KIE_AI_API_KEY>, body { model, input }
- *     Seedance input: { prompt, duration (4-15s), aspect_ratio, resolution,
+ *     Seedance 2.0 input: { prompt, duration (4-15s), aspect_ratio, resolution,
  *              generate_audio, reference_image_urls? }
+ *     Seedance 2.5 input: { prompt, duration (4-30s), aspect_ratio, resolution,
+ *              generate_audio, reference_image_urls? (up to 30, aspect ratio
+ *              0.4-2.5 each) } — see buildSeedance25Input.
  *     Kling O3 input: { prompt, customize_multi_shots, multi_prompt: [{prompt,
  *              duration}], audio, resolution (720p/1080p/4k, no 480p), aspect_ratio,
  *              duration (3-15s) } — see buildKlingInput.
@@ -77,6 +93,7 @@ const execFileAsync = promisify(execFile);
 
 const KIE_BASE_URL = "https://api.kie.ai/api/v1/jobs";
 const MODEL_SEEDANCE = "bytedance/seedance-2";
+const MODEL_SEEDANCE_25 = "bytedance/seedance-2-5";
 const MODEL_KLING = "kling-3.0-omni/text-to-video";
 const MIN_DURATION = 4;
 const MAX_DURATION = 15;
@@ -85,6 +102,10 @@ const MAX_DURATION = 15;
 // 3s request.
 const KLING_MIN_DURATION = 3;
 const KLING_MAX_DURATION = 15;
+// Seedance 2.5's headline difference from 2.0: a single call natively reaches 30s
+// (confirmed via Kie.ai's own docs), not just 15 — see the file-level doc comment.
+const SEEDANCE_25_MIN_DURATION = 4;
+const SEEDANCE_25_MAX_DURATION = 30;
 
 // Matches the "UGC Authenticity Keywords" / "Universal Quality Control Negatives"
 // blocks present verbatim in every worked example in the course material — these
@@ -191,8 +212,11 @@ function buildAspectRatio(aspectRatio: VideoGenerationRequestInput["aspectRatio"
   return aspectRatio === "landscape" ? "16:9" : "9:16";
 }
 
-function clampDuration(totalSeconds: number): number {
-  return Math.min(MAX_DURATION, Math.max(MIN_DURATION, totalSeconds));
+// Shared by both Seedance tiers, which only differ in their min/max bounds (2.0: 4-15s,
+// 2.5: 4-30s) — Kling inlines the same Math.min/max at its own call site since its
+// duration also feeds into buildKlingInput's returned object rather than standing alone.
+function clampDuration(totalSeconds: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, totalSeconds));
 }
 
 const KLING_PROMPT_MAX_CHARS = 3072;
@@ -203,12 +227,13 @@ const KLING_PROMPT_MAX_CHARS = 3072;
 const KLING_ELEMENT_MIN_IMAGES = 2;
 const KLING_ELEMENT_MAX_IMAGES = 4;
 const KLING_PRODUCT_ELEMENT_NAME = "product";
-// Confirmed live: Kie.ai rejects any element image outside this width/height range
-// ("aspect ratio must be between 0.4 and 2.5") — landing-page screenshots
-// (screenshotService.ts) are deliberately full-page/tall for human review (a real one
-// came back 390x2863, ratio ~0.14), so they routinely violate this.
-const KLING_ELEMENT_MIN_ASPECT = 0.4;
-const KLING_ELEMENT_MAX_ASPECT = 2.5;
+// Confirmed live: Kie.ai rejects any Kling element (or Seedance 2.5 reference) image
+// outside this width/height range ("aspect ratio must be between 0.4 and 2.5") —
+// landing-page screenshots (screenshotService.ts) are deliberately full-page/tall for
+// human review (a real one came back 390x2863, ratio ~0.14), so they routinely
+// violate this. Shared by both models' reference-image handling (prepareReferenceImage).
+const REFERENCE_IMAGE_MIN_ASPECT = 0.4;
+const REFERENCE_IMAGE_MAX_ASPECT = 2.5;
 
 /** Kling's top-level `prompt` is a required *fallback* summary, capped at 3072 chars
  * by Kie.ai (confirmed live: reusing buildVideoPrompt's full Seedance-style output —
@@ -285,16 +310,18 @@ function buildKlingShotPrompt(
   return `${scene.action} ${extras.join(" ").slice(0, budget - 3)}...`;
 }
 
-/** Crops an image down to Kling's valid 0.4-2.5 aspect ratio if it's outside that
- * range, re-uploading the crop and returning its new URL; returns the original URL
- * unchanged if already valid (the common case for manually-uploaded product photos —
- * this only re-processes what actually needs it). Top-crops (keeps width, trims
- * height) rather than center- or bottom-cropping, since a landing page's hero/header
- * — the top of the page — is the most recognizable, useful crop for a reference image,
- * not an arbitrary lower slice. Returns null if the image can't be fetched/decoded at
- * all, so the caller can drop it rather than fail the whole generation over one bad
- * URL. */
-async function prepareKlingReferenceImage(url: string): Promise<string | null> {
+/** Crops an image down to a 0.4-2.5 aspect ratio if it's outside that range,
+ * re-uploading the crop and returning its new URL; returns the original URL unchanged
+ * if already valid (the common case for manually-uploaded product photos — this only
+ * re-processes what actually needs it). Shared by Kling's `elements` mechanism and
+ * Seedance 2.5's `reference_image_urls` — confirmed via both models' Kie.ai docs to
+ * enforce the identical 0.4-2.5 bound, so one crop helper covers both. Top-crops
+ * (keeps width, trims height) rather than center- or bottom-cropping, since a landing
+ * page's hero/header — the top of the page — is the most recognizable, useful crop for
+ * a reference image, not an arbitrary lower slice. Returns null if the image can't be
+ * fetched/decoded at all, so the caller can drop it rather than fail the whole
+ * generation over one bad URL. */
+async function prepareReferenceImage(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
@@ -303,12 +330,12 @@ async function prepareKlingReferenceImage(url: string): Promise<string | null> {
     if (!metadata.width || !metadata.height) return null;
 
     const aspect = metadata.width / metadata.height;
-    if (aspect >= KLING_ELEMENT_MIN_ASPECT && aspect <= KLING_ELEMENT_MAX_ASPECT) {
+    if (aspect >= REFERENCE_IMAGE_MIN_ASPECT && aspect <= REFERENCE_IMAGE_MAX_ASPECT) {
       return url;
     }
 
-    const targetWidth = aspect > KLING_ELEMENT_MAX_ASPECT ? Math.round(metadata.height * KLING_ELEMENT_MAX_ASPECT) : metadata.width;
-    const targetHeight = aspect < KLING_ELEMENT_MIN_ASPECT ? Math.round(metadata.width / KLING_ELEMENT_MIN_ASPECT) : metadata.height;
+    const targetWidth = aspect > REFERENCE_IMAGE_MAX_ASPECT ? Math.round(metadata.height * REFERENCE_IMAGE_MAX_ASPECT) : metadata.width;
+    const targetHeight = aspect < REFERENCE_IMAGE_MIN_ASPECT ? Math.round(metadata.width / REFERENCE_IMAGE_MIN_ASPECT) : metadata.height;
 
     const cropped = await sharp(buffer)
       .extract({
@@ -322,7 +349,7 @@ async function prepareKlingReferenceImage(url: string): Promise<string | null> {
 
     return await uploadFile(cropped, `${randomUUID()}-kling-ref.jpg`, "image/jpeg");
   } catch (err) {
-    console.error("Failed to prepare Kling reference image:", url, err);
+    console.error("Failed to prepare reference image:", url, err);
     return null;
   }
 }
@@ -335,7 +362,7 @@ async function prepareKlingReferenceImage(url: string): Promise<string | null> {
  * screenshot has no valid representation here, unlike Seedance's
  * reference_image_urls which accepts any count starting at 1. */
 async function buildProductElement(request: VideoGenerationRequestInput): Promise<Record<string, unknown> | undefined> {
-  const prepared = await Promise.all(request.productShots.map(prepareKlingReferenceImage));
+  const prepared = await Promise.all(request.productShots.map(prepareReferenceImage));
   const valid = prepared.filter((url): url is string => url !== null);
   if (valid.length < KLING_ELEMENT_MIN_IMAGES) return undefined;
 
@@ -370,6 +397,31 @@ export async function buildKlingInput(
     aspect_ratio: buildAspectRatio(request.aspectRatio),
     duration: Math.min(KLING_MAX_DURATION, Math.max(KLING_MIN_DURATION, totalDuration)),
   };
+}
+
+/** Builds the input body for Seedance 2.5 — same continuous-take prompt shape as
+ * Seedance 2.0 (buildVideoPrompt already handles both; there's no per-model prompt
+ * difference), but with a 30s duration ceiling instead of 15 and reference_image_urls
+ * cropped to the same 0.4-2.5 aspect-ratio bound Kling's `elements` enforces (unlike
+ * Kling, Seedance 2.5 has no documented minimum image count, so even a single valid
+ * shot is sent rather than requiring 2+). */
+async function buildSeedance25Input(request: VideoGenerationRequestInput, blueprintInsight?: VideoBlueprintInsight): Promise<Record<string, unknown>> {
+  const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
+  const input: Record<string, unknown> = {
+    prompt: buildVideoPrompt(request, blueprintInsight),
+    duration: clampDuration(totalDuration, SEEDANCE_25_MIN_DURATION, SEEDANCE_25_MAX_DURATION),
+    aspect_ratio: buildAspectRatio(request.aspectRatio),
+    resolution: request.resolution,
+    generate_audio: true,
+  };
+
+  if (request.productShots.length > 0) {
+    const prepared = await Promise.all(request.productShots.map(prepareReferenceImage));
+    const valid = prepared.filter((url): url is string => url !== null);
+    if (valid.length > 0) input.reference_image_urls = valid;
+  }
+
+  return input;
 }
 
 export interface CutawayWindow {
@@ -454,9 +506,10 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
 
   // Flat if/else branch per model, mirroring imageGenerationService.ts's
   // generateImages — each branch builds its own request shape independently rather
-  // than forcing both models through a shared abstraction.
+  // than forcing all three models through a shared abstraction.
   const isKling = request.model === "kling-o3";
-  const model = isKling ? MODEL_KLING : MODEL_SEEDANCE;
+  const isSeedance25 = request.model === "seedance-2-5";
+  const model = isKling ? MODEL_KLING : isSeedance25 ? MODEL_SEEDANCE_25 : MODEL_SEEDANCE;
 
   // Cutaway plan is computed here (while we still have the real scene list) and
   // stashed on the log row keyed by taskId, since the poll route that eventually
@@ -497,11 +550,13 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
     let input: Record<string, unknown>;
     if (isKling) {
       input = await buildKlingInput(request, blueprintInsight);
+    } else if (isSeedance25) {
+      input = await buildSeedance25Input(request, blueprintInsight);
     } else {
       const totalDuration = request.scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
       input = {
         prompt: buildVideoPrompt(request, blueprintInsight),
-        duration: clampDuration(totalDuration),
+        duration: clampDuration(totalDuration, MIN_DURATION, MAX_DURATION),
         aspect_ratio: buildAspectRatio(request.aspectRatio),
         resolution: request.resolution,
         generate_audio: true,

@@ -17,16 +17,18 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const POLL_INTERVAL_MS = 10_000;
 const POLL_TIMEOUT_MS = 600_000;
 
-// Seedance generates one continuous clip per call, 4-15s total (no multi-shot API) —
-// scene durations are summed and clamped server-side, but the picker only offers
-// values that keep 1-3 scenes comfortably within that ceiling. Kling O3 (the second
-// model option below) genuinely supports up to 6 distinct shots/cuts within the same
-// 15s total, so it gets its own scene cap and shorter duration options — 6 scenes at
-// today's 3s floor would already exceed the ceiling.
+// Seedance generates one continuous clip per call (no multi-shot API) — scene
+// durations are summed and clamped server-side, but the picker only offers values
+// that keep 1-3 scenes comfortably within that ceiling: 15s for the original Seedance
+// 2.0, 30s for Seedance 2.5 (its headline difference — natively reaches double the
+// duration in one pass). Kling O3 genuinely supports up to 6 distinct shots/cuts
+// within a 15s total, so it gets its own scene cap and shorter duration options — 6
+// scenes at today's 3s floor would already exceed the ceiling.
 const SCENE_DURATION_OPTIONS = [3, 5, 7, 10, 15];
+const SEEDANCE25_SCENE_DURATION_OPTIONS = [4, 5, 7, 10, 15, 20, 25, 30];
 const KLING_SCENE_DURATION_OPTIONS = [1, 2, 3, 5, 7, 10, 15];
-const MAX_TOTAL_DURATION = 15;
-const MAX_SCENES_BY_MODEL = { seedance: 3, 'kling-o3': 6 };
+const MAX_TOTAL_DURATION_BY_MODEL = { seedance: 15, 'kling-o3': 15, 'seedance-2-5': 30 };
+const MAX_SCENES_BY_MODEL = { seedance: 3, 'kling-o3': 6, 'seedance-2-5': 3 };
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,12 +52,20 @@ export default function VideoAds() {
     const [location, setLocation] = useState('');
     const [aspectRatio, setAspectRatio] = useState('portrait');
     const [scenes, setScenes] = useState([{ durationSeconds: 10, action: '' }]);
-    // Which video generation backend to use — 'seedance' (default, one continuous
-    // take) or 'kling-o3' (real multi-shot storyboarding, see backend's
-    // buildKlingInput). Mirrors ImageAds.jsx's model picker pattern.
-    const [model, setModel] = useState('seedance');
+    // Which video generation backend to use — 'seedance-2-5' (default: ByteDance's
+    // newer flagship, one continuous take but natively reaches 30s and beats the
+    // other two on quality, confirmed via live testing), 'seedance' (the original
+    // Seedance 2.0 integration, kept as a cheaper/legacy option), or 'kling-o3' (real
+    // multi-shot storyboarding, see backend's buildKlingInput). Mirrors ImageAds.jsx's
+    // model picker pattern.
+    const [model, setModel] = useState('seedance-2-5');
     const maxScenes = MAX_SCENES_BY_MODEL[model];
-    const sceneDurationOptions = model === 'kling-o3' ? KLING_SCENE_DURATION_OPTIONS : SCENE_DURATION_OPTIONS;
+    const maxTotalDuration = MAX_TOTAL_DURATION_BY_MODEL[model];
+    const sceneDurationOptions = model === 'kling-o3'
+        ? KLING_SCENE_DURATION_OPTIONS
+        : model === 'seedance-2-5'
+            ? SEEDANCE25_SCENE_DURATION_OPTIONS
+            : SCENE_DURATION_OPTIONS;
 
     // Long-video continuation, Kling only — chains a second Kie.ai job
     // ("kling/v3-turbo-image-to-video") seeded from segment 1's actual last frame, past
@@ -65,13 +75,14 @@ export default function VideoAds() {
     const [part2Duration, setPart2Duration] = useState(10);
 
     const selectModel = (newModel) => {
-        // Switching back to Seedance while more scenes exist than it supports would
-        // leave stale scenes the "Add scene" cap silently prevents removing one at a
-        // time from ever being sent correctly — truncate up front instead.
-        if (newModel === 'seedance' && scenes.length > MAX_SCENES_BY_MODEL.seedance) {
-            setScenes((prev) => prev.slice(0, MAX_SCENES_BY_MODEL.seedance));
+        // Switching to a model with a lower scene cap while more scenes exist than it
+        // supports would leave stale scenes the "Add scene" cap silently prevents
+        // removing one at a time from ever being sent correctly — truncate up front.
+        const newCap = MAX_SCENES_BY_MODEL[newModel];
+        if (scenes.length > newCap) {
+            setScenes((prev) => prev.slice(0, newCap));
         }
-        if (newModel === 'seedance') {
+        if (newModel !== 'kling-o3') {
             setPart2Enabled(false);
         }
         setModel(newModel);
@@ -599,16 +610,26 @@ export default function VideoAds() {
 
                         <div>
                             <h3 className="text-lg font-bold text-ink mb-1">Video Model</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div
+                                    onClick={() => selectModel('seedance-2-5')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance-2-5' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-ink">Seedance 2.5 — Best Quality</span>
+                                        {model === 'seedance-2-5' && <Check className="text-brand-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, natively up to 30s. (Recommended)</p>
+                                </div>
                                 <div
                                     onClick={() => selectModel('seedance')}
                                     className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-ink">Seedance 2.0 — Continuous Take</span>
+                                        <span className="font-bold text-ink">Seedance 2.0 — Legacy</span>
                                         {model === 'seedance' && <Check className="text-brand-600" size={18} />}
                                     </div>
-                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts. (Default)</p>
+                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, up to 15s. Cheaper, lower quality than 2.5.</p>
                                 </div>
                                 <div
                                     onClick={() => selectModel('kling-o3')}
@@ -618,7 +639,7 @@ export default function VideoAds() {
                                         <span className="font-bold text-ink">Kling O3 — Multi-Shot</span>
                                         {model === 'kling-o3' && <Check className="text-brand-600" size={18} />}
                                     </div>
-                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts. Higher cost per generation. Needs at least 2 reference photos to use them (1 alone isn't enough).</p>
+                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts, and the only option with a long-video continuation mode. Needs at least 2 reference photos to use them (1 alone isn't enough).</p>
                                 </div>
                             </div>
                         </div>
@@ -649,15 +670,15 @@ export default function VideoAds() {
                             </div>
                             <p className="text-sm text-ink-tertiary mb-1">
                                 {model === 'kling-o3'
-                                    ? `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total — each scene renders as its own distinct shot/cut.`
-                                    : `Up to ${maxScenes} scenes, ${MAX_TOTAL_DURATION}s total (one continuous take). Describe what the character does and says in each.`}
+                                    ? `Up to ${maxScenes} scenes, ${maxTotalDuration}s total — each scene renders as its own distinct shot/cut.`
+                                    : `Up to ${maxScenes} scenes, ${maxTotalDuration}s total (one continuous take). Describe what the character does and says in each.`}
                                 {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && ' Scene 1 can stay blank to use the winning ad\'s own hook line directly.'}
                             </p>
                             <p className="text-sm text-ink-tertiary mb-1">
                                 Tip: for lead-gen offers, a scene like <span className="italic">"She holds her phone up, scrolling through the signup form — name, email, phone — and taps the button to submit"</span> renders as a natural phone reveal, not just narration.
                             </p>
-                            <p className={`text-sm mb-3 font-medium ${totalDuration > MAX_TOTAL_DURATION ? 'text-red-600' : 'text-ink-tertiary'}`}>
-                                {totalDuration}s / {MAX_TOTAL_DURATION}s{totalDuration > MAX_TOTAL_DURATION ? ' — will be trimmed to fit' : ''}
+                            <p className={`text-sm mb-3 font-medium ${totalDuration > maxTotalDuration ? 'text-red-600' : 'text-ink-tertiary'}`}>
+                                {totalDuration}s / {maxTotalDuration}s{totalDuration > maxTotalDuration ? ' — will be trimmed to fit' : ''}
                             </p>
                             <div className="space-y-3">
                                 {scenes.map((scene, i) => (

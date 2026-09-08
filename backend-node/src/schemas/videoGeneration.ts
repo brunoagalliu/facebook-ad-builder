@@ -2,16 +2,19 @@ import { z } from "zod";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
-// One beat of dialogue/action within the video. For Seedance (no multi-shot/storyboard
-// API) these are concatenated into one continuous prompt by videoGenerationService, so
-// the sum of scene durations is what's clamped to its 15s ceiling, not each scene
-// alone. For Kling O3 (see `model` below), each scene maps 1:1 onto a real distinct
-// shot/cut via its multi_prompt API — same duration-sum ceiling, but up to 6 scenes
+// One beat of dialogue/action within the video. For both Seedance tiers (no
+// multi-shot/storyboard API) these are concatenated into one continuous prompt by
+// videoGenerationService, so the sum of scene durations is what's clamped to the
+// model's ceiling (15s for "seedance", 30s for "seedance-2-5"), not each scene alone.
+// For Kling O3 (see `model` below), each scene maps 1:1 onto a real distinct shot/cut
+// via its multi_prompt API — same duration-sum-ceiling idea, but up to 6 scenes
 // instead of 3 since they're genuinely separate shots, not narrative beats within one
-// take. Max bumped from 3 to 6 to allow Kling's real shot count; Seedance-mode callers
-// are still expected to stay within 3 (enforced client-side, not re-validated here).
+// take. Per-scene max bumped to 30 to let a single Seedance 2.5 scene span its whole
+// duration; other models' own ceilings are enforced by clamping the summed total in
+// videoGenerationService, not by this per-scene bound. Scene *count* caps (3 vs 6) are
+// enforced client-side, not re-validated here.
 export const videoSceneSchema = z.object({
-  durationSeconds: z.number().int().min(1).max(15),
+  durationSeconds: z.number().int().min(1).max(30),
   action: z.string().min(1),
   // One of the product's real screenshots — overlays as this scene's entire visual in
   // the final video (audio/narration untouched), replacing whatever Kling renders for
@@ -58,12 +61,15 @@ export const videoGenerationRequestSchema = z
     character: characterSchema.optional(),
     location: z.string().optional(),
     scenes: z.array(videoSceneSchema).min(1).max(6),
-    // Which video generation backend to use: "seedance" (default, today's single
-    // continuous-take model) or "kling-o3" (kling-3.0-omni/text-to-video, real
-    // multi-shot storyboarding — see videoGenerationService.ts's buildKlingInput).
-    // Strict enum, not a freeform string, so a typo 400s at validation instead of
-    // silently falling through to the Seedance branch.
-    model: z.enum(["seedance", "kling-o3"]).optional().default("seedance"),
+    // Which video generation backend to use: "seedance-2-5" (default — ByteDance's
+    // newer flagship, single continuous-take model but natively reaches 30s in one
+    // call and beats both other options on quality/consistency, confirmed via this
+    // app's own live testing plus independent leaderboards), "seedance" (the original
+    // Seedance 2.0 integration, kept as a cheaper/legacy option, 15s ceiling), or
+    // "kling-o3" (kling-3.0-omni/text-to-video, real multi-shot storyboarding — see
+    // videoGenerationService.ts's buildKlingInput). Strict enum, not a freeform
+    // string, so a typo 400s at validation instead of silently falling through.
+    model: z.enum(["seedance", "kling-o3", "seedance-2-5"]).optional().default("seedance-2-5"),
     aspectRatio: z.enum(["portrait", "landscape"]).optional().default("portrait"),
     resolution: z.enum(["480p", "720p"]).optional().default("720p"),
     customPrompt: z.string().optional(),
