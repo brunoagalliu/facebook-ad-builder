@@ -246,6 +246,45 @@ function buildKlingFallbackPrompt(
   return prompt.length > KLING_PROMPT_MAX_CHARS ? `${prompt.slice(0, KLING_PROMPT_MAX_CHARS - 3)}...` : prompt;
 }
 
+// Each multi_prompt shot entry is capped at 512 chars by Kie.ai (separate from, and
+// much tighter than, the top-level prompt's 3072) — confirmed via Kie.ai's own docs.
+// Nowhere near enough room for Seedance's full boilerplate (its cinematography
+// paragraph alone runs ~400 chars, before the UGC-keyword and quality-control-negative
+// lists), so this is a condensed version carrying the same real signal: framing/
+// lighting/handheld-camera direction and the highest-value "don't look AI-generated"
+// negatives, distilled to fit every shot's budget alongside the user's own scene text.
+const KLING_SHOT_PROMPT_MAX_CHARS = 512;
+const KLING_SHOT_STYLE_CLAUSE =
+  "iPhone front-camera selfie style, medium close-up, natural handheld sway, soft natural light, authentic UGC delivery. Avoid: text overlays, watermark, distorted hands, cartoon look, artificial lighting.";
+
+/** Builds one shot's multi_prompt entry: the user's own scene text is never trimmed
+ * (it's the actual content), only the added style/character/hook boilerplate gets cut
+ * if the combination would exceed Kling's 512-char per-shot cap. Character and hook
+ * framing are only prepended on the first scene — repeating them on every shot would
+ * burn budget better spent on the per-shot style clause, and Kling's own multi-shot
+ * consistency (same generation call, same subject) is what's expected to carry the
+ * character across the later shots, same as it would for a real film's later cuts. */
+function buildKlingShotPrompt(
+  scene: VideoGenerationRequestInput["scenes"][number],
+  index: number,
+  request: VideoGenerationRequestInput,
+  blueprintInsight?: VideoBlueprintInsight
+): string {
+  const extras: string[] = [];
+  if (index === 0) {
+    extras.push(`${buildCharacterClause(request.character)}.`);
+    if (blueprintInsight?.hook_type) extras.push(`Open with a "${blueprintInsight.hook_type}"-style hook.`);
+  }
+  extras.push(KLING_SHOT_STYLE_CLAUSE);
+
+  const full = [scene.action, ...extras].join(" ");
+  if (full.length <= KLING_SHOT_PROMPT_MAX_CHARS) return full;
+
+  const budget = KLING_SHOT_PROMPT_MAX_CHARS - scene.action.length - 1;
+  if (budget < 20) return scene.action.slice(0, KLING_SHOT_PROMPT_MAX_CHARS);
+  return `${scene.action} ${extras.join(" ").slice(0, budget - 3)}...`;
+}
+
 /** Crops an image down to Kling's valid 0.4-2.5 aspect ratio if it's outside that
  * range, re-uploading the crop and returning its new URL; returns the original URL
  * unchanged if already valid (the common case for manually-uploaded product photos —
@@ -320,7 +359,7 @@ export async function buildKlingInput(
   return {
     prompt: buildKlingFallbackPrompt(request, blueprintInsight, Boolean(productElement)),
     customize_multi_shots: true,
-    multi_prompt: request.scenes.map((s) => ({ prompt: s.action, duration: s.durationSeconds })),
+    multi_prompt: request.scenes.map((s, i) => ({ prompt: buildKlingShotPrompt(s, i, request, blueprintInsight), duration: s.durationSeconds })),
     ...(productElement ? { elements: [productElement] } : {}),
     // Seedance always hardcodes audio on (below) — these are talking-head UGC ads, so
     // silent output would be a regression. Kling's own default is false.
