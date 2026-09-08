@@ -811,7 +811,10 @@ export default function VideoAds() {
                                     controls
                                     className="max-w-sm mx-auto rounded-lg shadow-md mb-6"
                                 />
-                                <div className="flex items-center justify-center gap-3">
+                                <p className="text-sm text-ink-tertiary mb-4">
+                                    Not quite right? Tweak the character, script, or model and regenerate — your selections are still filled in.
+                                </p>
+                                <div className="flex items-center justify-center gap-3 flex-wrap">
                                     <button
                                         type="button"
                                         onClick={() => downloadFile(generatedVideoUrl, `generated-video-${Date.now()}.mp4`).catch(() => showError('Failed to download video. Please try again.'))}
@@ -820,13 +823,24 @@ export default function VideoAds() {
                                         <Download size={18} /> Download
                                     </button>
                                     <button
+                                        type="button"
+                                        onClick={() => {
+                                            setGeneratedVideoUrl(null);
+                                            setGenerationState(null);
+                                            setCurrentStep(4);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-surface-hover text-ink-secondary rounded-lg hover:bg-border font-medium"
+                                    >
+                                        <Wand2 size={18} /> Refine & Regenerate
+                                    </button>
+                                    <button
                                         onClick={() => {
                                             setGeneratedVideoUrl(null);
                                             setGenerationState(null);
                                         }}
                                         className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium"
                                     >
-                                        <Sparkles size={18} /> Generate Another
+                                        <Sparkles size={18} /> Generate Another (same settings)
                                     </button>
                                 </div>
                             </>
