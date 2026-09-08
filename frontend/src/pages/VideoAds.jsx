@@ -57,12 +57,22 @@ export default function VideoAds() {
     const maxScenes = MAX_SCENES_BY_MODEL[model];
     const sceneDurationOptions = model === 'kling-o3' ? KLING_SCENE_DURATION_OPTIONS : SCENE_DURATION_OPTIONS;
 
+    // Long-video continuation, Kling only — chains a second Kie.ai job
+    // ("kling/v3-turbo-image-to-video") seeded from segment 1's actual last frame, past
+    // Kling's own 15s hard cap. See videoGenerationService.ts's createSegment2Task.
+    const [part2Enabled, setPart2Enabled] = useState(false);
+    const [part2Action, setPart2Action] = useState('');
+    const [part2Duration, setPart2Duration] = useState(10);
+
     const selectModel = (newModel) => {
         // Switching back to Seedance while more scenes exist than it supports would
         // leave stale scenes the "Add scene" cap silently prevents removing one at a
         // time from ever being sent correctly — truncate up front instead.
         if (newModel === 'seedance' && scenes.length > MAX_SCENES_BY_MODEL.seedance) {
             setScenes((prev) => prev.slice(0, MAX_SCENES_BY_MODEL.seedance));
+        }
+        if (newModel === 'seedance') {
+            setPart2Enabled(false);
         }
         setModel(newModel);
     };
@@ -218,11 +228,11 @@ export default function VideoAds() {
         setScenes(prev => prev.filter((_, i) => i !== index));
     };
 
-    const pollVideoStatus = async (taskId) => {
+    const pollVideoStatus = async (taskId, timeoutMs = POLL_TIMEOUT_MS) => {
         const startedAt = Date.now();
         while (!pollAbortRef.current) {
-            if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
-                throw new Error('Video generation timed out after 10 minutes. Check back later or try again.');
+            if (Date.now() - startedAt > timeoutMs) {
+                throw new Error(`Video generation timed out after ${Math.round(timeoutMs / 60_000)} minutes. Check back later or try again.`);
             }
             await sleep(POLL_INTERVAL_MS);
 
@@ -261,6 +271,10 @@ export default function VideoAds() {
             return s;
         });
 
+        const part2 = (model === 'kling-o3' && part2Enabled && part2Action.trim())
+            ? { action: part2Action.trim(), durationSeconds: part2Duration }
+            : undefined;
+
         try {
             const response = await authFetch(`${API_URL}/generated-ads/generate-video`, {
                 method: 'POST',
@@ -282,6 +296,7 @@ export default function VideoAds() {
                     model,
                     mode: templateMode,
                     templateId: templateMode === 'single' ? selectedVideoTemplate?.id : undefined,
+                    part2,
                 })
             });
 
@@ -290,7 +305,9 @@ export default function VideoAds() {
                 throw new Error(data.detail || 'Failed to start video generation');
             }
 
-            const videoUrl = await pollVideoStatus(data.task_id);
+            // Segment 1 + segment 2 + frame-extraction/concat work needs more headroom
+            // than a single job's 10-minute window.
+            const videoUrl = await pollVideoStatus(data.task_id, part2 ? 900_000 : POLL_TIMEOUT_MS);
             setGeneratedVideoUrl(videoUrl);
             showSuccess('Video generated successfully!');
 
@@ -693,6 +710,44 @@ export default function VideoAds() {
                                     </div>
                                 ))}
                             </div>
+
+                            {model === 'kling-o3' && (
+                                <div className="mt-4 pt-4 border-t border-border">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={part2Enabled}
+                                            onChange={(e) => setPart2Enabled(e.target.checked)}
+                                            className="rounded border-border"
+                                        />
+                                        <span className="text-sm font-bold text-ink">Continue for longer (up to +15s)</span>
+                                    </label>
+                                    <p className="text-xs text-ink-tertiary mb-2">
+                                        Chains a second Kling generation seeded from this video's own last frame — real visual continuity at the seam, not two unrelated clips stitched together. Audio isn't continuous across the seam, and generation takes noticeably longer.
+                                    </p>
+                                    {part2Enabled && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-ink-secondary">Continuation duration:</span>
+                                                <select
+                                                    value={part2Duration}
+                                                    onChange={(e) => setPart2Duration(Number(e.target.value))}
+                                                    className="text-sm border border-border rounded px-2 py-1"
+                                                >
+                                                    {KLING_SCENE_DURATION_OPTIONS.filter((d) => d >= 3).map((d) => <option key={d} value={d}>{d}s</option>)}
+                                                </select>
+                                            </div>
+                                            <textarea
+                                                value={part2Action}
+                                                onChange={(e) => setPart2Action(e.target.value)}
+                                                placeholder='What happens next? e.g. "She smiles, gives a thumbs up to the camera, and walks off."'
+                                                rows={2}
+                                                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

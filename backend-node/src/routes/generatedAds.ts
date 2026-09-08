@@ -1,4 +1,5 @@
 import type { GeneratedAd } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { Router } from "express";
 
 import { prisma } from "../core/prisma";
@@ -6,14 +7,25 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
-import { videoGenerationRequestSchema } from "../schemas/videoGeneration";
+import { Part2Input, videoGenerationRequestSchema } from "../schemas/videoGeneration";
 import { AdBlueprint } from "../schemas/adBlueprint";
 import { VideoBlueprint } from "../schemas/videoBlueprint";
 import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "../services/blueprintSynthesisService";
 import { generateImages } from "../services/imageGenerationService";
-import { createVideoTask, CutawayWindow, downloadAndSaveVideo, getVideoTaskStatus } from "../services/videoGenerationService";
-import { finalizeVideoGenerationLog, getLogMetadataByTaskId } from "../services/aiUsageService";
+import {
+  applyCutaways,
+  concatenateVideos,
+  createSegment2Task,
+  CutawayWindow,
+  createVideoTask,
+  downloadAndSaveVideo,
+  downloadVideoBuffer,
+  extractLastFrame,
+  getVideoTaskStatus,
+} from "../services/videoGenerationService";
+import { uploadFile } from "../services/storage";
+import { attachTaskId, finalizeVideoGenerationLog, finalizeVideoGenerationLogById, getLogById, updateLogMetadata } from "../services/aiUsageService";
 import { serialize as serializeWinningAd } from "./templates";
 
 const router = Router();
@@ -129,15 +141,19 @@ router.get(
 );
 
 // Starts an async Kie.ai/Sora video generation job. The frontend polls
-// GET /generate-video/:taskId until it gets a terminal state.
+// GET /generate-video/:id until it gets a terminal state. The id returned here is our
+// own AiGenerationLog row's id, not Kie.ai's taskId — long-video mode needs to swap
+// which real Kie.ai job backs a generation partway through (segment 1 -> segment 2),
+// and the frontend's poll target has to stay stable across that swap. See
+// aiUsageService.ts's getLogById for the indirection this enables.
 router.post(
   "/generate-video",
   requirePermission("ads:write"),
   validateBody(videoGenerationRequestSchema),
   asyncHandler(async (req, res) => {
     try {
-      const taskId = await createVideoTask(req.body);
-      res.json({ task_id: taskId });
+      const logId = await createVideoTask(req.body);
+      res.json({ task_id: logId });
     } catch (err) {
       res.status(502).json({ detail: (err as Error).message || "Video generation failed to start" });
     }
@@ -147,26 +163,74 @@ router.post(
 // Poll for job status. On first observing "success", downloads and persists the
 // result before Kie.ai's 24h result-URL expiry — callers must stop polling once a
 // terminal state (success/fail) comes back, since a second poll after success would
-// re-download and duplicate-store the same video.
+// re-download and duplicate-store the same video. Long-video mode adds a middle
+// state: segment 1 succeeding doesn't mean the *generation* is done — it means
+// segment 2 (a continuation seeded from segment 1's last frame) needs to start, so
+// this responds with a non-terminal "generating" state and the frontend just keeps
+// polling the same id, unaware anything changed underneath.
 router.get(
   "/generate-video/:taskId",
   requireAuth,
   asyncHandler(async (req, res) => {
     try {
-      const status = await getVideoTaskStatus(req.params.taskId);
+      const log = await getLogById(req.params.taskId);
+      if (!log) {
+        res.status(404).json({ detail: "Generation not found" });
+        return;
+      }
+      if (!log.taskId) {
+        // createVideoTask threw before ever reaching Kie.ai — finalizeVideoGenerationLogById
+        // already flipped status to "error" in that case.
+        res.json({ state: log.status === "error" ? "fail" : "waiting" });
+        return;
+      }
+
+      const status = await getVideoTaskStatus(log.taskId);
+      const cutaways = (log.metadata?.cutaways as CutawayWindow[] | undefined) ?? [];
+
       if (status.state === "success" && status.resultUrl) {
-        // Cutaway plan was stashed on the log row at task-creation time (see
-        // createVideoTask) since this route only ever sees a bare taskId, not the
-        // original request's scenes.
-        const metadata = await getLogMetadataByTaskId(req.params.taskId);
-        const cutaways = (metadata?.cutaways as CutawayWindow[] | undefined) ?? [];
+        if (log.metadata?.stage === "segment1") {
+          try {
+            const rawBuffer = await downloadVideoBuffer(status.resultUrl);
+            const processedBuffer = await applyCutaways(rawBuffer, cutaways);
+            const segment1VideoUrl = await uploadFile(processedBuffer, `generated_${randomUUID()}_seg1.mp4`, "video/mp4");
+            const lastFrame = await extractLastFrame(processedBuffer);
+            const lastFrameUrl = await uploadFile(lastFrame, `${randomUUID()}-seg1-lastframe.jpg`, "image/jpeg");
+
+            const part2 = log.metadata.part2 as Part2Input;
+            const fallbackResolution = (log.metadata.resolution as string) ?? "720p";
+            const segment2TaskId = await createSegment2Task(part2, lastFrameUrl, fallbackResolution);
+
+            await Promise.all([
+              attachTaskId(req.params.taskId, segment2TaskId),
+              updateLogMetadata(req.params.taskId, { ...log.metadata, stage: "segment2", segment1VideoUrl }),
+            ]);
+            res.json({ state: "generating", progress: 50 });
+          } catch (err) {
+            await finalizeVideoGenerationLogById(req.params.taskId, { status: "error", errorMessage: `Segment 2 setup failed: ${(err as Error).message}` });
+            res.json({ state: "fail", detail: (err as Error).message });
+          }
+          return;
+        }
+
+        if (log.metadata?.stage === "segment2") {
+          const seg1Buffer = await downloadVideoBuffer(log.metadata.segment1VideoUrl as string);
+          const seg2Buffer = await downloadVideoBuffer(status.resultUrl);
+          const combined = await concatenateVideos(seg1Buffer, seg2Buffer);
+          const finalUrl = await uploadFile(combined, `generated_${randomUUID()}.mp4`, "video/mp4");
+          await finalizeVideoGenerationLog(log.taskId, { status: "success" });
+          res.json({ state: "success", video_url: finalUrl });
+          return;
+        }
+
+        // Plain single-segment path — unchanged from before the ID-indirection change.
         const videoUrl = await downloadAndSaveVideo(status.resultUrl, cutaways);
-        await finalizeVideoGenerationLog(req.params.taskId, { status: "success" });
+        await finalizeVideoGenerationLog(log.taskId, { status: "success" });
         res.json({ state: status.state, video_url: videoUrl });
         return;
       }
       if (status.state === "fail") {
-        await finalizeVideoGenerationLog(req.params.taskId, { status: "error", errorMessage: status.failMsg });
+        await finalizeVideoGenerationLog(log.taskId, { status: "error", errorMessage: status.failMsg });
       }
       res.json({ state: status.state, progress: status.progress, detail: status.failMsg });
     } catch (err) {

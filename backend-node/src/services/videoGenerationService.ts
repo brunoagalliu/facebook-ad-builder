@@ -52,7 +52,7 @@ import sharp from "sharp";
 
 import { settings } from "../core/config";
 import { prisma } from "../core/prisma";
-import { CharacterInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
+import { CharacterInput, Part2Input, VideoGenerationRequestInput } from "../schemas/videoGeneration";
 import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "./blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "./blueprintSynthesisService";
 import { uploadFile } from "./storage";
@@ -464,15 +464,31 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
   // getLogMetadataByTaskId.
   const cutaways = isKling ? buildCutawayPlan(request) : [];
 
+  // stage:"segment1" tells the poll route to chain a second Kie.ai job (segment 2, an
+  // image-to-video continuation seeded from segment 1's last frame) instead of
+  // finalizing on first success — see generatedAds.ts's GET /generate-video/:id.
+  const metadata: Record<string, unknown> = {};
+  if (cutaways.length) metadata.cutaways = cutaways;
+  if (isKling && request.part2) {
+    metadata.part2 = request.part2;
+    metadata.stage = "segment1";
+    // Segment 2's own resolution falls back to this if request.part2.resolution isn't
+    // explicitly set — stashed now since the poll route that creates segment 2's task
+    // only has access to whatever survives in this metadata blob, not the original request.
+    metadata.resolution = request.resolution;
+  }
+
   // Started before the createTask call so a "pending" row exists even if createTask
   // itself throws below — finalizeVideoGenerationLogById closes it out as an error in
   // that case since no taskId ever gets assigned. Finalized later (success/fail) by
-  // GET /generate-video/:taskId in generatedAds.ts once polling observes a terminal
-  // state, since that happens well after this function has already returned.
+  // GET /generate-video/:id in generatedAds.ts once polling observes a terminal state,
+  // since that happens well after this function has already returned. This row's own
+  // id (not Kie.ai's taskId) is what gets returned to the caller below — see
+  // aiUsageService.ts's getLogById for why the two are deliberately different things.
   const logId = await startVideoGenerationLog({
     model,
     brandId,
-    metadata: cutaways.length ? { cutaways } : undefined,
+    metadata: Object.keys(metadata).length ? metadata : undefined,
   });
 
   try {
@@ -509,7 +525,7 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
       throw new Error(data.msg || `Kie.ai createTask failed with status ${response.status}`);
     }
     await attachTaskId(logId, data.data.taskId);
-    return data.data.taskId;
+    return logId;
   } catch (err) {
     await finalizeVideoGenerationLogById(logId, { status: "error", errorMessage: (err as Error).message });
     throw err;
@@ -561,7 +577,7 @@ export async function getVideoTaskStatus(taskId: string): Promise<VideoTaskStatu
  * URL, a malformed window) — a cutaway is a nice-to-have polish step, and losing an
  * otherwise-successful generation over it would be a much worse outcome than just
  * skipping the overlay. */
-async function applyCutaways(videoBuffer: Buffer, cutaways: CutawayWindow[]): Promise<Buffer> {
+export async function applyCutaways(videoBuffer: Buffer, cutaways: CutawayWindow[]): Promise<Buffer> {
   if (cutaways.length === 0) return videoBuffer;
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "cutaway-"));
@@ -639,12 +655,152 @@ async function applyCutaways(videoBuffer: Buffer, cutaways: CutawayWindow[]): Pr
 }
 
 /** Kie.ai's result URLs expire 24h after task completion — download immediately
- * rather than storing the ephemeral URL, mirroring downloadAndSaveImage. */
-export async function downloadAndSaveVideo(videoUrl: string, cutaways: CutawayWindow[] = []): Promise<string> {
+ * rather than storing the ephemeral URL, mirroring downloadAndSaveImage. Shared by the
+ * plain single-segment path below and long-video mode's segment-handling in
+ * generatedAds.ts, which needs the raw buffer before deciding what to do with it. */
+export async function downloadVideoBuffer(videoUrl: string): Promise<Buffer> {
   const response = await fetch(videoUrl, { signal: AbortSignal.timeout(120_000) });
   if (!response.ok) throw new Error(`Failed to download video: ${response.status}`);
-  const rawBuffer = Buffer.from(await response.arrayBuffer());
+  return Buffer.from(await response.arrayBuffer());
+}
+
+export async function downloadAndSaveVideo(videoUrl: string, cutaways: CutawayWindow[] = []): Promise<string> {
+  const rawBuffer = await downloadVideoBuffer(videoUrl);
   const buffer = await applyCutaways(rawBuffer, cutaways);
   const filename = `generated_${randomUUID()}.mp4`;
   return uploadFile(buffer, filename, "video/mp4");
+}
+
+/** Grabs the final frame of a video as a still image — the seed for long-video mode's
+ * segment 2 (an image-to-video continuation), so it visually picks up exactly where
+ * segment 1 left off. `-sseof -1` seeks 1s before end-of-file (robust without needing
+ * to know the exact duration up front) then takes 1 frame. Unlike applyCutaways, there
+ * is no original-buffer fallback on failure — there's no sane default for "couldn't get
+ * a starting frame," so this propagates and the caller finalizes a real error rather
+ * than silently producing a broken segment 2. */
+export async function extractLastFrame(videoBuffer: Buffer): Promise<Buffer> {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "lastframe-"));
+  try {
+    const inputPath = path.join(workDir, "input.mp4");
+    await fs.writeFile(inputPath, videoBuffer);
+    const framePath = path.join(workDir, "frame.jpg");
+    await execFileAsync("ffmpeg", ["-y", "-sseof", "-1", "-i", inputPath, "-frames:v", "1", "-q:v", "2", framePath]);
+    return await fs.readFile(framePath);
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/** Creates segment 2's Kie.ai job — a genuinely different model from segment 1's
+ * multi-shot "kling-3.0-omni/text-to-video": "kling/v3-turbo-image-to-video" takes a
+ * single prompt + single duration (no multi_prompt array) seeded from a starting
+ * image. Confirmed against Kie.ai's own docs, not guessed. Kling has no 1080p-only
+ * gap like the main model's 480p floor, but still normalizes away anything this app
+ * doesn't otherwise support. */
+export async function createSegment2Task(part2: Part2Input, imageUrl: string, fallbackResolution: string): Promise<string> {
+  const input = {
+    prompt: part2.action.slice(0, 2500),
+    image_urls: [imageUrl],
+    duration: String(part2.durationSeconds),
+    resolution: part2.resolution ?? (fallbackResolution === "480p" ? "720p" : fallbackResolution),
+  };
+  const response = await fetch(`${KIE_BASE_URL}/createTask`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.KIE_AI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: "kling/v3-turbo-image-to-video", input }),
+  });
+  const data = (await response.json()) as CreateTaskResponse;
+  if (!response.ok || data.code !== 200 || !data.data?.taskId) {
+    throw new Error(data.msg || `Kie.ai createTask (segment 2) failed with status ${response.status}`);
+  }
+  return data.data.taskId;
+}
+
+/** Concatenates two independently-generated clips into one final video. Uses the
+ * filter_complex concat approach rather than the concat demuxer's fast stream-copy
+ * path, since there's no guarantee two different Kie.ai models emit byte-identical
+ * codec parameters — the same "don't trust an undocumented fast path" lesson as
+ * applyCutaways abandoning scale2ref once it didn't parse on the deployed ffmpeg
+ * build. Re-probes segment 1's real dimensions (consistent with applyCutaways) and
+ * scales/normalizes both inputs to match before the concat filter, which requires
+ * uniform format. Falls back to returning segment 1 alone on any failure — still a
+ * real, playable video, the same "never lose a working result over a polish step"
+ * precedent applyCutaways already established. */
+export async function concatenateVideos(seg1Buffer: Buffer, seg2Buffer: Buffer): Promise<Buffer> {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "concat-"));
+  try {
+    const seg1Path = path.join(workDir, "seg1.mp4");
+    const seg2Path = path.join(workDir, "seg2.mp4");
+    await fs.writeFile(seg1Path, seg1Buffer);
+    await fs.writeFile(seg2Path, seg2Buffer);
+
+    const { stdout: dimensionsOut } = await execFileAsync("ffprobe", [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=width,height",
+      "-of",
+      "csv=s=x:p=0",
+      seg1Path,
+    ]);
+    const [width, height] = dimensionsOut.trim().split("x").map(Number);
+    if (!width || !height) throw new Error(`Could not determine segment 1 dimensions from ffprobe output: "${dimensionsOut}"`);
+
+    // Neither segment is guaranteed to have an audio stream — segment 2 comes from a
+    // different Kie.ai model (kling/v3-turbo-image-to-video) whose audio behavior
+    // isn't documented the way segment 1's explicit `audio: true` flag is. Probing
+    // each file and substituting a silent track for whichever lacks one avoids a hard
+    // ffmpeg failure (and the resulting silent fallback to segment 1 alone) over
+    // something as unimportant as one segment being quiet.
+    const hasAudioStream = async (filePath: string): Promise<boolean> => {
+      const { stdout } = await execFileAsync("ffprobe", ["-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", filePath]);
+      return stdout.trim().length > 0;
+    };
+    const [seg1HasAudio, seg2HasAudio] = await Promise.all([hasAudioStream(seg1Path), hasAudioStream(seg2Path)]);
+
+    const inputArgs = ["-i", seg1Path, "-i", seg2Path];
+    let nextInputIndex = 2;
+    const audioLabelFor = (segHasAudio: boolean, sourceIndex: number, outLabel: string): string => {
+      if (segHasAudio) return `[${sourceIndex}:a]aformat=sample_rates=44100:channel_layouts=stereo[${outLabel}];`;
+      const silentIndex = nextInputIndex++;
+      inputArgs.push("-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo");
+      return `[${silentIndex}:a]atrim=duration=15[${outLabel}];`;
+    };
+    // atrim caps the silent track at a safe upper bound (both segments' durations are
+    // already individually capped at 15s by their own schemas) — concat only uses as
+    // much of it as the paired video stream runs for, so overshooting is harmless.
+    const audio0 = audioLabelFor(seg1HasAudio, 0, "a0");
+    const audio1 = audioLabelFor(seg2HasAudio, 1, "a1");
+
+    const outputPath = path.join(workDir, "output.mp4");
+    await execFileAsync("ffmpeg", [
+      "-y",
+      ...inputArgs,
+      "-filter_complex",
+      `[0:v]scale=${width}:${height},setsar=1,fps=30[v0];` + `[1:v]scale=${width}:${height},setsar=1,fps=30[v1];` + audio0 + audio1 + `[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]`,
+      "-map",
+      "[vout]",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      outputPath,
+    ]);
+
+    return await fs.readFile(outputPath);
+  } catch (err) {
+    console.error("Failed to concatenate long-video segments, using segment 1 alone instead:", err);
+    return seg1Buffer;
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }

@@ -149,6 +149,28 @@ export async function attachTaskId(logId: string, taskId: string): Promise<void>
   await prisma.aiGenerationLog.update({ where: { id: logId }, data: { taskId } }).catch((err) => console.error("Failed to attach taskId to AiGenerationLog:", err));
 }
 
+// Resolves our own id (returned to the frontend as "task_id" — see createVideoTask) to
+// whichever real Kie.ai job is currently in flight for this generation. Long-video mode
+// re-points a single row at a second, later-created Kie.ai task via attachTaskId once
+// segment 1 finishes, so "the id the frontend polls by" and "the current real taskId"
+// are deliberately different things — this is the lookup that bridges them.
+export async function getLogById(logId: string): Promise<{ taskId: string | null; metadata: Record<string, unknown> | null; status: string } | null> {
+  try {
+    const log = await prisma.aiGenerationLog.findUnique({ where: { id: logId } });
+    if (!log) return null;
+    return { taskId: log.taskId, metadata: log.metadata as Record<string, unknown> | null, status: log.status };
+  } catch (err) {
+    console.error("Failed to read AiGenerationLog by id:", err);
+    return null;
+  }
+}
+
+export async function updateLogMetadata(logId: string, metadata: Record<string, unknown>): Promise<void> {
+  await prisma.aiGenerationLog
+    .update({ where: { id: logId }, data: { metadata: metadata as Prisma.InputJsonValue } })
+    .catch((err) => console.error("Failed to update AiGenerationLog metadata:", err));
+}
+
 // Read-only lookup for data stashed at task-creation time (e.g. cutaway overlay plans)
 // that the poll route needs before it finalizes the row — best-effort, never throws,
 // since a lookup failure should degrade to "no plan" rather than break the download.
