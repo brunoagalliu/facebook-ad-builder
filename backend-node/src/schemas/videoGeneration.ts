@@ -81,6 +81,13 @@ export const videoGenerationRequestSchema = z
     mode: z.enum(["auto", "single", "vertical"]).optional().default("auto"),
     templateId: z.string().optional(),
     part2: part2Schema.optional(),
+    // Pipes the already-built prompt (customPrompt, or buildVideoPrompt's template
+    // output) through Claude for a more natural/specific rewrite before it's sent to
+    // Kie.ai — see videoPromptService.ts's reworkPromptWithClaude for how the
+    // UGC-authenticity/quality-control lines are protected from being altered.
+    // Seedance only: Kling's real per-shot content lives in multi_prompt, which this
+    // never touches, so it'd be a no-op there rather than doing anything useful.
+    useClaudePrompt: z.boolean().optional().default(false),
   })
   .superRefine((data, ctx) => {
     if (data.part2 && data.model !== "kling-o3") {
@@ -90,8 +97,27 @@ export const videoGenerationRequestSchema = z
         message: 'part2 continuation requires model: "kling-o3" — Seedance has no confirmed continuation path',
       });
     }
+    if (data.useClaudePrompt && data.model === "kling-o3") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["useClaudePrompt"],
+        message: "useClaudePrompt only reworks the single continuous prompt Seedance models use — Kling's real content lives in per-shot multi_prompt entries, which this does not touch",
+      });
+    }
   });
 export type VideoGenerationRequestInput = z.infer<typeof videoGenerationRequestSchema>;
+
+// Expands one rough scene idea into a vivid, filmable beat via Claude — model-agnostic,
+// since the result just becomes the scene's own `action` text before whichever
+// prompt-building path (Seedance's continuous prompt or Kling's per-shot prompts) runs.
+export const sceneEnhanceRequestSchema = z.object({
+  action: z.string().min(1),
+  character: characterSchema.optional(),
+  location: z.string().optional(),
+  productName: z.string().optional(),
+  brandVoice: z.string().optional(),
+});
+export type SceneEnhanceRequestInput = z.infer<typeof sceneEnhanceRequestSchema>;
 
 // Targeted "fix just this" edit on an already-generated video, rather than a full
 // reroll — Seedance 2.5 only (confirmed live: feeding an existing video back in via

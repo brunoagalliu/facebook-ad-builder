@@ -69,6 +69,7 @@ import sharp from "sharp";
 import { settings } from "../core/config";
 import { prisma } from "../core/prisma";
 import { CharacterInput, Part2Input, VideoEditRequestInput, VideoGenerationRequestInput } from "../schemas/videoGeneration";
+import { reworkPromptWithClaude } from "./videoPromptService";
 import { selectBlueprintForBrand, selectVideoBlueprintForBrand } from "./blueprintSelectionService";
 import { synthesizeVerticalImageBlueprint, synthesizeVerticalVideoBlueprint } from "./blueprintSynthesisService";
 import { uploadFile } from "./storage";
@@ -563,6 +564,18 @@ export async function createVideoTask(request: VideoGenerationRequestInput): Pro
       };
       if (request.productShots.length > 0) {
         input.reference_image_urls = request.productShots;
+      }
+    }
+
+    // Claude-polished prompt is opt-in and Seedance-only (superRefine already rejects
+    // it for Kling) — never breaks a generation over a polish step, same "graceful
+    // fallback" precedent as applyCutaways/concatenateVideos.
+    if (!isKling && request.useClaudePrompt && typeof input.prompt === "string") {
+      const brandVoice = (request.brand as Record<string, unknown> | undefined)?.voice as string | undefined;
+      try {
+        input.prompt = await reworkPromptWithClaude(input.prompt, brandVoice);
+      } catch (err) {
+        console.error("Claude prompt rework failed, using template prompt as-is:", err);
       }
     }
 

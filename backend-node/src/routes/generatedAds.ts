@@ -7,7 +7,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { BatchSaveRequestInput, batchSaveRequestSchema, imageGenerationRequestSchema } from "../schemas/generatedAd";
-import { Part2Input, videoEditRequestSchema, videoGenerationRequestSchema } from "../schemas/videoGeneration";
+import { Part2Input, sceneEnhanceRequestSchema, videoEditRequestSchema, videoGenerationRequestSchema } from "../schemas/videoGeneration";
 import { AdBlueprint } from "../schemas/adBlueprint";
 import { VideoBlueprint } from "../schemas/videoBlueprint";
 import { getCandidateBlueprintsForVertical, selectBlueprintForBrand, selectVideoBlueprintForBrand } from "../services/blueprintSelectionService";
@@ -25,6 +25,7 @@ import {
   extractLastFrame,
   getVideoTaskStatus,
 } from "../services/videoGenerationService";
+import { enhanceSceneAction } from "../services/videoPromptService";
 import { uploadFile } from "../services/storage";
 import { attachTaskId, finalizeVideoGenerationLog, finalizeVideoGenerationLogById, getLogById, updateLogMetadata } from "../services/aiUsageService";
 import { serialize as serializeWinningAd } from "./templates";
@@ -175,6 +176,23 @@ router.post(
       res.json({ task_id: logId });
     } catch (err) {
       res.status(502).json({ detail: (err as Error).message || "Video edit failed to start" });
+    }
+  })
+);
+
+// Synchronous — Claude expands one rough scene idea in a couple seconds, no Kie.ai
+// job/polling involved. Returns the enhanced text for the frontend to drop straight
+// into that scene's action field.
+router.post(
+  "/enhance-scene",
+  requirePermission("ads:write"),
+  validateBody(sceneEnhanceRequestSchema),
+  asyncHandler(async (req, res) => {
+    try {
+      const enhanced = await enhanceSceneAction(req.body);
+      res.json({ enhanced });
+    } catch (err) {
+      res.status(502).json({ detail: (err as Error).message || "Failed to enhance scene" });
     }
   })
 );

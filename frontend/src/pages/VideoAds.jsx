@@ -75,6 +75,15 @@ export default function VideoAds() {
     const [part2Action, setPart2Action] = useState('');
     const [part2Duration, setPart2Duration] = useState(10);
 
+    // Claude-assisted prompt authoring, two independent opt-ins: enhancingSceneIndex
+    // expands one scene's rough idea in place (model-agnostic — the result is just
+    // better scene.action text); useClaudePrompt reworks the *entire* built prompt for
+    // more natural prose before it's sent to Kie.ai, Seedance-only since Kling's real
+    // content lives in per-shot prompts this never touches (mirrors the backend's own
+    // superRefine restriction).
+    const [enhancingSceneIndex, setEnhancingSceneIndex] = useState(null);
+    const [useClaudePrompt, setUseClaudePrompt] = useState(false);
+
     const selectModel = (newModel) => {
         // Switching to a model with a lower scene cap while more scenes exist than it
         // supports would leave stale scenes the "Add scene" cap silently prevents
@@ -251,6 +260,38 @@ export default function VideoAds() {
         setScenes(prev => prev.filter((_, i) => i !== index));
     };
 
+    const enhanceScene = async (index) => {
+        const scene = scenes[index];
+        if (!scene.action.trim()) {
+            showError('Write a rough idea first, then enhance it.');
+            return;
+        }
+        setEnhancingSceneIndex(index);
+        try {
+            const response = await authFetch(`${API_URL}/generated-ads/enhance-scene`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: scene.action,
+                    character: (character.name || character.description) ? character : undefined,
+                    location: location || undefined,
+                    productName: wizardData.product?.name,
+                    brandVoice: wizardData.brand?.voice,
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to enhance scene');
+            }
+            updateScene(index, 'action', data.enhanced);
+        } catch (error) {
+            console.error('Scene enhance error:', error);
+            showError(error.message || 'Failed to enhance scene. Please try again.');
+        } finally {
+            setEnhancingSceneIndex(null);
+        }
+    };
+
     const pollVideoStatus = async (taskId, timeoutMs = POLL_TIMEOUT_MS) => {
         const startedAt = Date.now();
         while (!pollAbortRef.current) {
@@ -321,6 +362,7 @@ export default function VideoAds() {
                     mode: templateMode,
                     templateId: templateMode === 'single' ? selectedVideoTemplate?.id : undefined,
                     part2,
+                    useClaudePrompt: model !== 'kling-o3' && useClaudePrompt,
                 })
             });
 
@@ -787,6 +829,14 @@ export default function VideoAds() {
                                             rows={2}
                                             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => enhanceScene(i)}
+                                            disabled={enhancingSceneIndex === i || !scene.action.trim()}
+                                            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 disabled:opacity-40 disabled:cursor-not-allowed mt-1"
+                                        >
+                                            <Sparkles size={14} /> {enhancingSceneIndex === i ? 'Enhancing…' : 'Enhance with Claude'}
+                                        </button>
                                         {model === 'kling-o3' && wizardData.product?.product_shots?.length > 0 && (
                                             <div className="mt-2">
                                                 <select
@@ -807,6 +857,23 @@ export default function VideoAds() {
                                     </div>
                                 ))}
                             </div>
+
+                            {model !== 'kling-o3' && (
+                                <div className="mt-4 pt-4 border-t border-border">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={useClaudePrompt}
+                                            onChange={(e) => setUseClaudePrompt(e.target.checked)}
+                                            className="rounded border-border"
+                                        />
+                                        <span className="text-sm font-bold text-ink">Let Claude rework the full prompt</span>
+                                    </label>
+                                    <p className="text-xs text-ink-tertiary">
+                                        Rewrites the whole generated prompt for more natural, specific prose (matching this brand's voice) before it's sent to the video model — the proven authenticity/quality-control instructions are preserved untouched, only the descriptive parts are rewritten.
+                                    </p>
+                                </div>
+                            )}
 
                             {model === 'kling-o3' && (
                                 <div className="mt-4 pt-4 border-t border-border">
