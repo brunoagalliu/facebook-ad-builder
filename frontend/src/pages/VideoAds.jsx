@@ -229,12 +229,21 @@ export default function VideoAds() {
         }
     };
 
+    // Split from a single "Video Style" step that had grown into 7 stacked sections
+    // (Creative Reference, Character, Setting, Aspect Ratio, Resolution, Video Model,
+    // Script) as features were added incrementally over time — Format groups the
+    // technical/cost decisions (model, aspect ratio, resolution) plus who/where, while
+    // Script groups everything about what the video actually says (creative
+    // reference, scenes, AI-assist tools, model-specific extras like cutaways/
+    // long-video/full-prompt-rework). Model lives in Format since it determines scene
+    // duration options, max scene count, and which Script extras even appear.
     const steps = [
         { id: 1, name: 'Brand', icon: Briefcase },
         { id: 2, name: 'Product', icon: Package },
         { id: 3, name: 'Profile', icon: Users },
-        { id: 4, name: 'Video Style', icon: Video },
-        { id: 5, name: 'Generate', icon: Sparkles }
+        { id: 4, name: 'Format', icon: Video },
+        { id: 5, name: 'Script', icon: Film },
+        { id: 6, name: 'Generate', icon: Sparkles }
     ];
 
     const updateData = (field, value) => {
@@ -246,11 +255,14 @@ export default function VideoAds() {
             case 1: return wizardData.brand !== null;
             case 2: return wizardData.product !== null;
             case 3: return wizardData.profile !== null;
+            // Format (model/aspect ratio/resolution/character/setting) always has
+            // sensible defaults — nothing here blocks proceeding.
+            case 4: return true;
             // Scene 1 can stay blank if a winning ad's hook_transcript is available to
             // fall back on at generate time (see handleGenerate) — any additional
             // scenes beyond the first still need real content, since there's no
             // per-scene blueprint data to substitute for those.
-            case 4: return scenes.every((s, i) =>
+            case 5: return scenes.every((s, i) =>
                 s.action.trim().length > 0 || (i === 0 && Boolean(selectedVideoTemplate?.video_blueprint_json?.hook_transcript))
             );
             default: return true;
@@ -545,10 +557,10 @@ export default function VideoAds() {
             </div>
 
             {/* Skip straight to Generate once there's a real winning ad's hook line to
-                use — bypasses Video Style entirely instead of requiring a click through
-                Character/Setting/Script when nothing in them needs customizing. */}
+                use — bypasses Format and Script entirely instead of requiring a click
+                through Character/Setting/Script when nothing in them needs customizing. */}
             {wizardData.brand && wizardData.product && wizardData.profile
-                && selectedVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 5 && (
+                && selectedVideoTemplate?.video_blueprint_json?.hook_transcript && currentStep < 6 && (
                 <div className="mb-6 flex items-center justify-between gap-4 bg-brand-50 border border-brand-200 rounded-xl p-4">
                     <div className="flex items-center gap-3">
                         {selectedVideoTemplate.image_url && (
@@ -556,13 +568,13 @@ export default function VideoAds() {
                         )}
                         <div>
                             <p className="font-medium text-ink">Ready to generate from {selectedVideoTemplate.name}</p>
-                            <p className="text-sm text-ink-secondary">Skip Video Style — hook line and pacing pulled from this winning ad.</p>
+                            <p className="text-sm text-ink-secondary">Skip Format & Script — hook line and pacing pulled from this winning ad.</p>
                         </div>
                     </div>
                     <button
                         type="button"
                         disabled={fillingFromWinningAd}
-                        onClick={async () => { await fillFromWinningAd(); setCurrentStep(5); }}
+                        onClick={async () => { await fillFromWinningAd(); setCurrentStep(6); }}
                         className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
                     >
                         {fillingFromWinningAd ? 'Writing script…' : '⚡ Skip to Generate'}
@@ -653,8 +665,122 @@ export default function VideoAds() {
                     />
                 )}
 
-                {/* Step 4: Video Style — character, setting, and scene script */}
+                {/* Step 4: Format — model, aspect ratio/resolution, and who/where.
+                    Model comes first since it determines Script's scene duration
+                    options, max scene count, and which model-specific extras appear
+                    there. */}
                 {currentStep === 4 && (
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-ink mb-1">Video Model</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div
+                                    onClick={() => selectModel('seedance-2-5')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance-2-5' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-ink">Seedance 2.5 — Best Quality</span>
+                                        {model === 'seedance-2-5' && <Check className="text-brand-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, natively up to 30s. (Recommended)</p>
+                                </div>
+                                <div
+                                    onClick={() => selectModel('seedance')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-ink">Seedance 2.0 — Legacy</span>
+                                        {model === 'seedance' && <Check className="text-brand-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, up to 15s. Cheaper, lower quality than 2.5.</p>
+                                </div>
+                                <div
+                                    onClick={() => selectModel('kling-o3')}
+                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'kling-o3' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-ink">Kling O3 — Multi-Shot</span>
+                                        {model === 'kling-o3' && <Check className="text-brand-600" size={18} />}
+                                    </div>
+                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts, and the only option with a long-video continuation mode. Needs at least 2 reference photos to use them (1 alone isn't enough).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="text-lg font-bold text-ink">Aspect Ratio</h3>
+                            </div>
+                            <div className="flex gap-2">
+                                {['portrait', 'landscape'].map((ratio) => (
+                                    <button
+                                        key={ratio}
+                                        type="button"
+                                        onClick={() => setAspectRatio(ratio)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${aspectRatio === ratio ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
+                                    >
+                                        {ratio}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="text-lg font-bold text-ink">Resolution</h3>
+                            </div>
+                            <div className="flex gap-2">
+                                {['480p', '720p', '1080p'].map((res) => (
+                                    <button
+                                        key={res}
+                                        type="button"
+                                        onClick={() => setResolution(res)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${resolution === res ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
+                                    >
+                                        {res}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-sm text-ink-tertiary mt-1">
+                                480p costs roughly half as much per generation as 720p/1080p — a good default for cheap testing before committing to a full-quality run.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 className="text-lg font-bold text-ink mb-1">Character</h3>
+                            <p className="text-sm text-ink-tertiary mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                                <textarea
+                                    value={character.description}
+                                    onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Additional detail: hair, features, clothing, voice, mannerisms…"
+                                    rows={2}
+                                    className="col-span-2 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-lg font-bold text-ink mb-1">Setting</h3>
+                            <input
+                                type="text"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="e.g. a cozy, well-lit home kitchen"
+                                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 5: Script — creative reference and the scene-by-scene script,
+                    plus the AI-assist tools and model-specific extras that only make
+                    sense once real script content exists. */}
+                {currentStep === 5 && (
                     <div className="space-y-6">
                         <div>
                             <h3 className="text-lg font-bold text-ink mb-1">Creative Reference</h3>
@@ -723,110 +849,6 @@ export default function VideoAds() {
                                     <div className="text-sm text-ink-tertiary">No analyzed winning ads found in this brand's vertical yet.</div>
                                 )
                             )}
-                        </div>
-
-                        <div>
-                            <h3 className="text-lg font-bold text-ink mb-1">Character</h3>
-                            <p className="text-sm text-ink-tertiary mb-3">Describe who's on camera. A product photo (selected in the previous step) doubles as a visual reference for consistency.</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <input type="text" value={character.name} onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))} placeholder="Name (optional)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                                <input type="text" value={character.age} onChange={(e) => setCharacter(prev => ({ ...prev, age: e.target.value }))} placeholder="Age (e.g. mid-20s)" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                                <input type="text" value={character.ethnicity} onChange={(e) => setCharacter(prev => ({ ...prev, ethnicity: e.target.value }))} placeholder="Ethnicity" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                                <input type="text" value={character.gender} onChange={(e) => setCharacter(prev => ({ ...prev, gender: e.target.value }))} placeholder="Gender" className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                                <textarea
-                                    value={character.description}
-                                    onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Additional detail: hair, features, clothing, voice, mannerisms…"
-                                    rows={2}
-                                    className="col-span-2 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-lg font-bold text-ink mb-1">Setting</h3>
-                            <input
-                                type="text"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                                placeholder="e.g. a cozy, well-lit home kitchen"
-                                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                            />
-                        </div>
-
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <h3 className="text-lg font-bold text-ink">Aspect Ratio</h3>
-                            </div>
-                            <div className="flex gap-2">
-                                {['portrait', 'landscape'].map((ratio) => (
-                                    <button
-                                        key={ratio}
-                                        type="button"
-                                        onClick={() => setAspectRatio(ratio)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${aspectRatio === ratio ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
-                                    >
-                                        {ratio}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <h3 className="text-lg font-bold text-ink">Resolution</h3>
-                            </div>
-                            <div className="flex gap-2">
-                                {['480p', '720p', '1080p'].map((res) => (
-                                    <button
-                                        key={res}
-                                        type="button"
-                                        onClick={() => setResolution(res)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${resolution === res ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
-                                    >
-                                        {res}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-sm text-ink-tertiary mt-1">
-                                480p costs roughly half as much per generation as 720p/1080p — a good default for cheap testing before committing to a full-quality run.
-                            </p>
-                        </div>
-
-                        <div>
-                            <h3 className="text-lg font-bold text-ink mb-1">Video Model</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div
-                                    onClick={() => selectModel('seedance-2-5')}
-                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance-2-5' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-ink">Seedance 2.5 — Best Quality</span>
-                                        {model === 'seedance-2-5' && <Check className="text-brand-600" size={18} />}
-                                    </div>
-                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, natively up to 30s. (Recommended)</p>
-                                </div>
-                                <div
-                                    onClick={() => selectModel('seedance')}
-                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'seedance' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-ink">Seedance 2.0 — Legacy</span>
-                                        {model === 'seedance' && <Check className="text-brand-600" size={18} />}
-                                    </div>
-                                    <p className="text-sm text-ink-secondary">One fluid handheld shot, no cuts, up to 15s. Cheaper, lower quality than 2.5.</p>
-                                </div>
-                                <div
-                                    onClick={() => selectModel('kling-o3')}
-                                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${model === 'kling-o3' ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-ink">Kling O3 — Multi-Shot</span>
-                                        {model === 'kling-o3' && <Check className="text-brand-600" size={18} />}
-                                    </div>
-                                    <p className="text-sm text-ink-secondary">Up to 6 distinct shots/cuts, and the only option with a long-video continuation mode. Needs at least 2 reference photos to use them (1 alone isn't enough).</p>
-                                </div>
-                            </div>
                         </div>
 
                         <div>
@@ -984,8 +1006,8 @@ export default function VideoAds() {
                     </div>
                 )}
 
-                {/* Step 5: Generate */}
-                {currentStep === 5 && (
+                {/* Step 6: Generate */}
+                {currentStep === 6 && (
                     <div className="text-center py-12">
                         {!generatedVideoUrl && !generating && (
                             <>
@@ -1037,7 +1059,9 @@ export default function VideoAds() {
                                         onClick={() => {
                                             setGeneratedVideoUrl(null);
                                             setGenerationState(null);
-                                            setCurrentStep(4);
+                                            // Script (5), not Format (4) — most refinements are to the
+                                            // dialogue/scenes, not the model/resolution; Format is one Back away.
+                                            setCurrentStep(5);
                                         }}
                                         className="flex items-center gap-2 px-4 py-2 bg-surface-hover text-ink-secondary rounded-lg hover:bg-border font-medium"
                                     >
