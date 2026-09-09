@@ -165,24 +165,64 @@ export default function VideoAds() {
         // 'auto' repopulates itself via the effect above.
     };
 
-    // hook_transcript is just the opening line of a longer source ad — feeding it as
-    // the *only* scene left the generated video with nothing to resolve into, trailing
-    // off with no payoff/CTA (confirmed live: a 10s video that just stops after the
-    // hook line). Building a real two-beat hook+CTA script instead of pasting an
-    // isolated sentence gives the model something to land on.
-    const buildScenesFromTemplate = () => {
-        const hook = selectedVideoTemplate?.video_blueprint_json?.hook_transcript;
-        if (!hook) return null;
-        const productName = wizardData.product?.name || wizardData.brand?.name || 'this';
-        return [
-            { durationSeconds: 10, action: hook },
-            { durationSeconds: 5, action: `She turns to the camera and says: "If that's you, ${productName} could help — tap below to see if you qualify."` },
-        ];
+    const [fillingFromWinningAd, setFillingFromWinningAd] = useState(false);
+
+    // hook_transcript is just the opening line of a longer source ad, and is often
+    // itself a fragment — Gemini Vision transcribes only the hook segment (e.g. 0-9s
+    // of a longer clip), and the real sentence frequently continues past that
+    // boundary (confirmed live: a real winning ad's hook_transcript came back as
+    // "I don't know who needs to hear this, but if you have over $10,000 in credit
+    // card debt" — a dangling clause with no resolution). Pasting it verbatim as
+    // Scene 1, plus a generic hardcoded bridge line as Scene 2, produced a script
+    // that looked incomplete and disconnected from what the ad actually says next.
+    // Routing both through the same Claude scene-enhancement endpoint used elsewhere
+    // completes the truncated hook into a real sentence and writes a Scene 2 that
+    // continues the actual thought (using the blueprint's narrative_arc as a guide),
+    // instead of a generic reused CTA line.
+    const enhanceSceneText = async (action) => {
+        try {
+            const response = await authFetch(`${API_URL}/generated-ads/enhance-scene`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action,
+                    character: (character.name || character.description) ? character : undefined,
+                    location: location || undefined,
+                    productName: wizardData.product?.name,
+                    brandVoice: wizardData.brand?.voice,
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || 'Failed to enhance scene');
+            return data.enhanced;
+        } catch (error) {
+            console.error('Auto-enhance during fill-from-winning-ad failed, using raw text:', error);
+            return action;
+        }
     };
 
-    const fillFromWinningAd = () => {
-        const built = buildScenesFromTemplate();
-        if (built) setScenes(built);
+    const fillFromWinningAd = async () => {
+        const hook = selectedVideoTemplate?.video_blueprint_json?.hook_transcript;
+        if (!hook) return;
+        const productName = wizardData.product?.name || wizardData.brand?.name || 'this';
+        const narrativeArc = selectedVideoTemplate?.video_blueprint_json?.narrative_arc;
+
+        setFillingFromWinningAd(true);
+        try {
+            const [scene1Action, scene2Action] = await Promise.all([
+                enhanceSceneText(hook),
+                enhanceSceneText(
+                    `She turns to the camera and explains why ${productName} is the better alternative, then gives a clear, low-friction call to action to tap and check if they qualify.` +
+                    (narrativeArc ? ` (This ad's overall structure, for reference: ${narrativeArc})` : '')
+                ),
+            ]);
+            setScenes([
+                { durationSeconds: 10, action: scene1Action },
+                { durationSeconds: 5, action: scene2Action },
+            ]);
+        } finally {
+            setFillingFromWinningAd(false);
+        }
     };
 
     const steps = [
@@ -516,10 +556,11 @@ export default function VideoAds() {
                     </div>
                     <button
                         type="button"
-                        onClick={() => { fillFromWinningAd(); setCurrentStep(5); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium whitespace-nowrap"
+                        disabled={fillingFromWinningAd}
+                        onClick={async () => { await fillFromWinningAd(); setCurrentStep(5); }}
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
                     >
-                        ⚡ Skip to Generate
+                        {fillingFromWinningAd ? 'Writing script…' : '⚡ Skip to Generate'}
                     </button>
                 </div>
             )}
@@ -769,11 +810,12 @@ export default function VideoAds() {
                                     {selectedVideoTemplate?.video_blueprint_json?.hook_transcript && (
                                         <button
                                             type="button"
+                                            disabled={fillingFromWinningAd}
                                             onClick={fillFromWinningAd}
-                                            className="flex items-center gap-1 text-sm px-3 py-1 bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 font-medium"
-                                            title="Fills Scene 1's action/dialogue with this vertical's winning ad's actual hook line"
+                                            className="flex items-center gap-1 text-sm px-3 py-1 bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 font-medium disabled:opacity-60 disabled:cursor-wait"
+                                            title="Uses this winning ad's hook line as a starting point, completed and polished by Claude into a full two-beat script"
                                         >
-                                            ✨ Fill from Winning Ad
+                                            {fillingFromWinningAd ? 'Writing script…' : '✨ Fill from Winning Ad'}
                                         </button>
                                     )}
                                     <button
