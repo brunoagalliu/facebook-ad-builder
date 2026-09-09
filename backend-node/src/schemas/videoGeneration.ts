@@ -71,7 +71,14 @@ export const videoGenerationRequestSchema = z
     // string, so a typo 400s at validation instead of silently falling through.
     model: z.enum(["seedance", "kling-o3", "seedance-2-5"]).optional().default("seedance-2-5"),
     aspectRatio: z.enum(["portrait", "landscape"]).optional().default("portrait"),
-    resolution: z.enum(["480p", "720p"]).optional().default("720p"),
+    // 480p is meaningfully cheaper on Kie.ai than 720p/1080p (confirmed live: roughly
+    // half the per-second cost) — exposed as a real user choice rather than always
+    // defaulting to 720p, since Seedance 2.5's cost premium over the other models can
+    // burn through credits fast. Kling has no 480p tier of its own (buildKlingInput
+    // floors it to 720p); Seedance 2.0's 1080p support is unconfirmed but left
+    // available rather than blocked, since Kie.ai's own error is more trustworthy than
+    // a guess either way.
+    resolution: z.enum(["480p", "720p", "1080p"]).optional().default("720p"),
     customPrompt: z.string().optional(),
     // Which winning-ad blueprint should steer generation: "auto" (default, today's
     // behavior — createVideoTask picks one at random from the brand's vertical pool),

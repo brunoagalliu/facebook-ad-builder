@@ -52,6 +52,10 @@ export default function VideoAds() {
     const [character, setCharacter] = useState({ name: '', age: '', ethnicity: '', gender: '', description: '' });
     const [location, setLocation] = useState('');
     const [aspectRatio, setAspectRatio] = useState('portrait');
+    // 480p is meaningfully cheaper on Kie.ai than 720p/1080p (confirmed live: roughly
+    // half the per-second credit cost) — exposed as a real choice so cost-conscious
+    // testing doesn't require burning full-price credits every time.
+    const [resolution, setResolution] = useState('720p');
     const [scenes, setScenes] = useState([{ durationSeconds: 10, action: '' }]);
     // Which video generation backend to use — 'seedance-2-5' (default: ByteDance's
     // newer flagship, one continuous take but natively reaches 30s and beats the
@@ -398,6 +402,7 @@ export default function VideoAds() {
                     location: location || undefined,
                     scenes: scenesToSend,
                     aspectRatio,
+                    resolution,
                     model,
                     mode: templateMode,
                     templateId: templateMode === 'single' ? selectedVideoTemplate?.id : undefined,
@@ -765,6 +770,27 @@ export default function VideoAds() {
                                     </button>
                                 ))}
                             </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="text-lg font-bold text-ink">Resolution</h3>
+                            </div>
+                            <div className="flex gap-2">
+                                {['480p', '720p', '1080p'].map((res) => (
+                                    <button
+                                        key={res}
+                                        type="button"
+                                        onClick={() => setResolution(res)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${resolution === res ? 'bg-brand-600 text-white' : 'bg-surface-hover text-ink-secondary hover:bg-border'}`}
+                                    >
+                                        {res}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-sm text-ink-tertiary mt-1">
+                                480p costs roughly half as much per generation as 720p/1080p — a good default for cheap testing before committing to a full-quality run.
+                            </p>
                         </div>
 
                         <div>
