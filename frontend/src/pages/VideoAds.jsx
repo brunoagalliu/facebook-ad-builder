@@ -183,7 +183,7 @@ export default function VideoAds() {
     // completes the truncated hook into a real sentence and writes a Scene 2 that
     // continues the actual thought (using the blueprint's narrative_arc as a guide),
     // instead of a generic reused CTA line.
-    const enhanceSceneText = async (action) => {
+    const enhanceSceneText = async (action, otherScenes = []) => {
         try {
             const response = await authFetch(`${API_URL}/generated-ads/enhance-scene`, {
                 method: 'POST',
@@ -194,6 +194,7 @@ export default function VideoAds() {
                     location: location || undefined,
                     productName: wizardData.product?.name,
                     brandVoice: wizardData.brand?.voice,
+                    otherScenes: otherScenes.length ? otherScenes : undefined,
                 })
             });
             const data = await response.json().catch(() => ({}));
@@ -213,13 +214,16 @@ export default function VideoAds() {
 
         setFillingFromWinningAd(true);
         try {
-            const [scene1Action, scene2Action] = await Promise.all([
-                enhanceSceneText(hook),
-                enhanceSceneText(
-                    `She turns to the camera and explains why ${productName} is the better alternative, then gives a clear, low-friction call to action to tap and check if they qualify.` +
-                    (narrativeArc ? ` (This ad's overall structure, for reference: ${narrativeArc})` : '')
-                ),
-            ]);
+            // Sequential, not Promise.all — scene 2 needs scene 1's *finalized* text as
+            // continuity context (confirmed live: enhancing both independently produced
+            // one scene in a parked car and the other on a couch, since neither call
+            // knew what setting the other had invented).
+            const scene1Action = await enhanceSceneText(hook);
+            const scene2Action = await enhanceSceneText(
+                `She turns to the camera and explains why ${productName} is the better alternative, then gives a clear, low-friction call to action to tap and check if they qualify.` +
+                (narrativeArc ? ` (This ad's overall structure, for reference: ${narrativeArc})` : ''),
+                [scene1Action]
+            );
             setScenes([
                 { durationSeconds: 10, action: scene1Action },
                 { durationSeconds: 5, action: scene2Action },
@@ -324,6 +328,10 @@ export default function VideoAds() {
         }
         setEnhancingSceneIndex(index);
         try {
+            // Sibling scenes' current text, so this enhancement doesn't invent a
+            // different setting/wardrobe than what the other scenes already establish
+            // — same continuity fix as fillFromWinningAd.
+            const otherScenes = scenes.filter((_, i) => i !== index).map((s) => s.action).filter((a) => a.trim());
             const response = await authFetch(`${API_URL}/generated-ads/enhance-scene`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -333,6 +341,7 @@ export default function VideoAds() {
                     location: location || undefined,
                     productName: wizardData.product?.name,
                     brandVoice: wizardData.brand?.voice,
+                    otherScenes: otherScenes.length ? otherScenes : undefined,
                 })
             });
             const data = await response.json().catch(() => ({}));

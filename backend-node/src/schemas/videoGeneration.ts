@@ -123,6 +123,13 @@ export const sceneEnhanceRequestSchema = z.object({
   location: z.string().optional(),
   productName: z.string().optional(),
   brandVoice: z.string().optional(),
+  // Other scenes' already-written text, so this scene's enhancement doesn't invent a
+  // different setting/wardrobe/prop out of thin air — confirmed live: enhancing two
+  // scenes independently (no knowledge of each other) produced one in a parked car
+  // and one on a couch, a physically impossible jump for a model that renders these
+  // as one continuous take, not real cuts. Optional since a scene with no siblings
+  // yet (or the first one enhanced) has nothing to stay consistent with.
+  otherScenes: z.array(z.string()).optional(),
 });
 export type SceneEnhanceRequestInput = z.infer<typeof sceneEnhanceRequestSchema>;
 

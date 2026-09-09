@@ -52,6 +52,7 @@ export interface EnhanceSceneInput {
   location?: string;
   productName?: string;
   brandVoice?: string;
+  otherScenes?: string[];
 }
 
 export async function enhanceSceneAction(input: EnhanceSceneInput): Promise<string> {
@@ -64,9 +65,18 @@ export async function enhanceSceneAction(input: EnhanceSceneInput): Promise<stri
     .filter(Boolean)
     .join("\n");
 
+  // Without this, enhancing scenes independently (no knowledge of each other) lets
+  // Claude invent a different location/wardrobe/prop per call — confirmed live: one
+  // scene came back set in a parked car, the sibling scene on a couch. These scenes
+  // are almost always rendered as one continuous take, not real cuts, so a location
+  // jump between them is a physically impossible break, not a stylistic choice.
+  const continuityBlock = input.otherScenes?.length
+    ? `\n\nThis is one beat within a single continuous take alongside these other beats, already written:\n${input.otherScenes.map((s) => `- ${s}`).join("\n")}\n\nKeep the exact same setting, character wardrobe, and any props/positioning consistent with those — do not introduce a new location or outfit. Only the action/dialogue should differ.`
+    : "";
+
   const prompt = `You're writing one beat of action/dialogue for a UGC-style talking-head video ad — the kind a real person would film on their phone. Expand the rough idea below into a vivid, specific, filmable description: what the person does with their hands/body, and exactly what they say in quotes. 1-3 sentences, grounded and natural, not overwritten or melodramatic. Return ONLY the expanded scene text — no preamble, no quotation marks around the whole thing, no explanation.
 
-${contextLines ? `${contextLines}\n\n` : ""}Rough idea: ${input.action}`;
+${contextLines ? `${contextLines}\n\n` : ""}Rough idea: ${input.action}${continuityBlock}`;
 
   const response = await getClient().messages.create({
     model: MODEL,
