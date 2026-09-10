@@ -183,7 +183,7 @@ export default function VideoAds() {
     // completes the truncated hook into a real sentence and writes a Scene 2 that
     // continues the actual thought (using the blueprint's narrative_arc as a guide),
     // instead of a generic reused CTA line.
-    const enhanceSceneText = async (action, otherScenes = []) => {
+    const enhanceSceneText = async (action, otherScenes = [], durationSeconds = undefined) => {
         try {
             const response = await authFetch(`${API_URL}/generated-ads/enhance-scene`, {
                 method: 'POST',
@@ -195,6 +195,7 @@ export default function VideoAds() {
                     productName: wizardData.product?.name,
                     brandVoice: wizardData.brand?.voice,
                     otherScenes: otherScenes.length ? otherScenes : undefined,
+                    durationSeconds,
                 })
             });
             const data = await response.json().catch(() => ({}));
@@ -211,6 +212,8 @@ export default function VideoAds() {
         if (!hook) return;
         const productName = wizardData.product?.name || wizardData.brand?.name || 'this';
         const narrativeArc = selectedVideoTemplate?.video_blueprint_json?.narrative_arc;
+        const SCENE1_DURATION = 10;
+        const SCENE2_DURATION = 5;
 
         setFillingFromWinningAd(true);
         try {
@@ -218,15 +221,16 @@ export default function VideoAds() {
             // continuity context (confirmed live: enhancing both independently produced
             // one scene in a parked car and the other on a couch, since neither call
             // knew what setting the other had invented).
-            const scene1Action = await enhanceSceneText(hook);
+            const scene1Action = await enhanceSceneText(hook, [], SCENE1_DURATION);
             const scene2Action = await enhanceSceneText(
                 `She turns to the camera and explains why ${productName} is the better alternative, then gives a clear, low-friction call to action to tap and check if they qualify.` +
                 (narrativeArc ? ` (This ad's overall structure, for reference: ${narrativeArc})` : ''),
-                [scene1Action]
+                [scene1Action],
+                SCENE2_DURATION
             );
             setScenes([
-                { durationSeconds: 10, action: scene1Action },
-                { durationSeconds: 5, action: scene2Action },
+                { durationSeconds: SCENE1_DURATION, action: scene1Action },
+                { durationSeconds: SCENE2_DURATION, action: scene2Action },
             ]);
         } finally {
             setFillingFromWinningAd(false);
@@ -342,6 +346,7 @@ export default function VideoAds() {
                     productName: wizardData.product?.name,
                     brandVoice: wizardData.brand?.voice,
                     otherScenes: otherScenes.length ? otherScenes : undefined,
+                    durationSeconds: scene.durationSeconds,
                 })
             });
             const data = await response.json().catch(() => ({}));

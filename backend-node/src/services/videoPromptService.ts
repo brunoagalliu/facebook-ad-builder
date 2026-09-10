@@ -53,7 +53,15 @@ export interface EnhanceSceneInput {
   productName?: string;
   brandVoice?: string;
   otherScenes?: string[];
+  durationSeconds?: number;
 }
+
+// ~2.3 words/sec: natural, energetic conversational pace with room to spare for the
+// physical action a UGC beat also has to fit in — not all of a scene's screen time is
+// spent talking. Confirmed live this matters: a real generation's dialogue ran ~124
+// words for a 15s video (natural speech at that count takes ~50s), and the video
+// model compressed delivery to an unnaturally rushed pace to cram it all in.
+const WORDS_PER_SECOND_BUDGET = 2.3;
 
 export async function enhanceSceneAction(input: EnhanceSceneInput): Promise<string> {
   const contextLines = [
@@ -74,9 +82,13 @@ export async function enhanceSceneAction(input: EnhanceSceneInput): Promise<stri
     ? `\n\nThis is one beat within a single continuous take alongside these other beats, already written:\n${input.otherScenes.map((s) => `- ${s}`).join("\n")}\n\nKeep the exact same setting, character wardrobe, and any props/positioning consistent with those — do not introduce a new location or outfit. Only the action/dialogue should differ.`
     : "";
 
+  const wordBudgetBlock = input.durationSeconds
+    ? `\n\nThis scene has ${input.durationSeconds} seconds of screen time. At a natural, energetic pace, that's roughly ${Math.round(input.durationSeconds * WORDS_PER_SECOND_BUDGET)} words of ACTUAL SPOKEN DIALOGUE (only the words inside quotation marks — the physical action doesn't count toward this). Stay at or under that. Going over forces the video model to speed up delivery unnaturally to fit it all in.`
+    : "";
+
   const prompt = `You're writing one beat of action/dialogue for a UGC-style talking-head video ad — the kind a real person would film on their phone. Expand the rough idea below into a vivid, specific, filmable description: what the person does with their hands/body, and exactly what they say in quotes. 1-3 sentences, grounded and natural, not overwritten or melodramatic. Return ONLY the expanded scene text — no preamble, no quotation marks around the whole thing, no explanation.
 
-${contextLines ? `${contextLines}\n\n` : ""}Rough idea: ${input.action}${continuityBlock}`;
+${contextLines ? `${contextLines}\n\n` : ""}Rough idea: ${input.action}${continuityBlock}${wordBudgetBlock}`;
 
   const response = await getClient().messages.create({
     model: MODEL,

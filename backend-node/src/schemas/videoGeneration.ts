@@ -130,6 +130,13 @@ export const sceneEnhanceRequestSchema = z.object({
   // as one continuous take, not real cuts. Optional since a scene with no siblings
   // yet (or the first one enhanced) has nothing to stay consistent with.
   otherScenes: z.array(z.string()).optional(),
+  // Without this, Claude writes dialogue with no awareness of how many seconds it
+  // has to be spoken in — confirmed live: a real generation's two scenes carried
+  // ~124 words of dialogue for a 15s total video (natural speech at that word count
+  // takes ~50s), forcing the video model to compress delivery to an unnaturally
+  // rushed pace to fit it in. Optional so older callers/tests without a duration
+  // still work — enhanceSceneAction just skips the word-budget instruction then.
+  durationSeconds: z.number().int().min(1).max(30).optional(),
 });
 export type SceneEnhanceRequestInput = z.infer<typeof sceneEnhanceRequestSchema>;
 
